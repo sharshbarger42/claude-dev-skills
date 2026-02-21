@@ -9,5 +9,5 @@ Use this table to resolve shorthand repo names to their full `owner/repo` and lo
 | `recipe-readiness` | `selina/recipe-readiness` | `$HOME/gitea-repos/recipe-readiness/` |
 | `productivity` | `selina/productivity` | `$HOME/gitea-repos/productivity/` |
 | `productivity-home-base` | `selina/productivity-home-base` | `$HOME/` |
-| `development-skills` | `selina/development-skills` | `$HOME/gitea-repos/development-skills/` |
+| `development-skills` | `super-werewolves/development-skills` | `$HOME/gitea-repos/development-skills/` |
 | `dotfiles` | `selina/dotfiles` | `$HOME/gitea-repos/dotfiles/` |
