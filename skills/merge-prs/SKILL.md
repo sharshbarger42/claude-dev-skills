@@ -141,6 +141,24 @@ Check the HTTP response:
 
 Record the merge timestamp for each successfully merged PR.
 
+### Update local branch
+
+After merging, if the current working directory is inside the merged repo (check with `git remote get-url origin`), update the local default branch to match:
+
+```bash
+git checkout {default_branch} && git pull origin {default_branch}
+```
+
+If the current branch is a feature branch that was just merged and deleted remotely, switch to the default branch first. This ensures the local repo stays in sync and avoids stale branch references.
+
+If the current working directory is NOT inside the merged repo, check if the repo has a known local path (from the shorthand table). If it does, run the pull from that directory:
+
+```bash
+git -C {local_path} checkout {default_branch} && git -C {local_path} pull origin {default_branch}
+```
+
+If the local path doesn't exist or isn't a git repo, skip this step silently.
+
 ## Step 7: Check for deploy workflows
 
 Use this mapping to determine if a merged repo has a deploy-on-merge workflow:
