@@ -1,11 +1,11 @@
 # development-skills
 
-Portable Claude Code skills plugin. Single source of truth for all development, productivity, and infrastructure skills.
+Portable Claude Code skills plugin for dev workflow automation.
 
 ## Install
 
 ```bash
-git clone ssh://gitea@192.168.0.174:2222/selina/development-skills.git ~/gitea-repos/development-skills
+git clone ssh://gitea@192.168.0.174:2222/super-werewolves/development-skills.git ~/gitea-repos/development-skills
 cd ~/gitea-repos/development-skills
 ./install.sh
 ```
@@ -23,30 +23,16 @@ development-skills/
 ├── lib/
 │   └── resolve-repo.md     # Shared repo-parsing instructions
 └── skills/
-    ├── do-issue/           # Dev workflow: implement a Gitea issue
-    ├── review-pr/          # Dev workflow: automated PR code review
-    ├── fix-pr/             # Dev workflow: address PR review comments
-    ├── triage-issues/      # Dev workflow: prioritize repo issues
-    ├── morning/            # Daily morning briefing
-    ├── catch-up/           # Session catch-up
-    ├── check-in/           # Mid-session status check
-    ├── weekly-review/      # Weekly productivity review
-    ├── meal-plan/          # Meal planning with Tandoor + Grocy
-    ├── grocery-list/       # Shopping list generation
-    ├── service-check/      # Homelab service health check
-    ├── infra-report/       # VM/LXC resource usage report
-    ├── backup-status/      # Restic backup health
-    ├── dns-check/          # Pi-hole DNS verification
-    ├── tailnet-check/      # FQDN reachability via NPM
-    ├── media-report/       # JellyFin + ErsatzTV stats
-    ├── start/              # Full workspace orientation
-    └── start-quick/        # Quick workspace orientation
+    ├── do-issue/           # Implement a Gitea issue end-to-end
+    ├── review-pr/          # Automated PR code review
+    ├── fix-pr/             # Address PR review comments
+    └── triage-issues/      # Prioritize repo issues
 ```
 
 ## Config
 
-- `config/repos.md` — repo shorthand table (used by do-issue, fix-pr, review-pr, triage-issues)
-- `config/infrastructure.md` — IPs, domains, service URLs (used by dns-check, service-check, etc.)
+- `config/repos.md` — repo shorthand table (used by all 4 skills)
+- `config/infrastructure.md` — IPs, domains, service URLs (used by review-pr for Gitea API)
 - `lib/resolve-repo.md` — shared repo-parsing logic with `!cat` include of repos.md
 
 ### Per-VM customization
