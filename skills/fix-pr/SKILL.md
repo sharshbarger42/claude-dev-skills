@@ -30,6 +30,32 @@ Use `mcp__gitea__get_pull_request_by_index` with the parsed `owner`, `repo`, and
 
 If the PR is not found, report the error and stop.
 
+## Step 2b: Check for merge conflicts
+
+Check the `mergeable` field from the PR metadata. If `mergeable` is `false`, the PR has conflicts with the base branch that must be resolved before review comments can be addressed.
+
+### Resolve conflicts
+
+1. `cd` to the local repo path from the shorthand table
+2. `git fetch origin`
+3. `git checkout {head_branch} && git pull origin {head_branch}`
+4. Attempt to rebase onto the base branch: `git rebase origin/{base_branch}`
+5. If the rebase produces conflicts:
+   - Read each conflicting file and resolve the conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`)
+   - For each conflict, determine the correct resolution by understanding what both sides intended:
+     - The base branch side (`HEAD` / `ours` during rebase) has changes that were merged to main after the PR was created
+     - The PR branch side (`theirs` during rebase) has the PR's changes
+     - Usually the correct resolution is to keep **both** sets of changes merged together
+   - After resolving all conflicts in a file, `git add {file}`
+   - Run `git rebase --continue` to proceed to the next commit
+   - Repeat until the rebase completes
+6. Force-push the rebased branch: `git push origin {head_branch} --force-with-lease`
+7. Verify the PR is now mergeable by re-fetching PR metadata
+
+Report which files had conflicts and how they were resolved.
+
+If `mergeable` is `true`, skip this step entirely.
+
 ## Step 3: Fetch all comments
 
 Gather every comment on the PR from three sources:
