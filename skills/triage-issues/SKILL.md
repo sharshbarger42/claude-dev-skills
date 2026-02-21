@@ -48,9 +48,35 @@ An issue is **blocked** if any of these are true:
 - Its body contains an unchecked dependency like `- [ ] Depends on #N` or `Blocked by #N` where #N is still open
 - It has a label whose name contains `wontfix`, `duplicate`, or `invalid`
 
+Separately, flag issues that appear to be **duplicates** of each other — these are handled interactively in Step 5b rather than silently blocked.
+
 Everything else is **actionable**.
 
 Additionally, note issues with `status: in-progress` or `status: in-review` labels — these are already being worked on. Include them in the output but deprioritize them (they will receive a scoring penalty in Step 6).
+
+## Step 5b: Detect duplicates
+
+Compare all open issues pairwise looking for likely duplicates. Two issues are **likely duplicates** if any of these are true:
+- Their titles are identical or near-identical (ignoring case and punctuation)
+- Their bodies share the same core content (e.g., same error message, same PR reference, same root cause)
+- One issue's body references the other (e.g., "same as #N" or "duplicate of #N")
+
+For each duplicate group found:
+1. Pick the **recommended survivor** — prefer the issue that has: more labels, a milestone, more comments, or a lower issue number (older = canonical)
+2. Mark the others as duplicate candidates
+
+Present duplicates to the user using `AskUserQuestion` **before** showing the triage report. For each duplicate group, ask what to do:
+
+- **Close #{duplicate} as duplicate of #{survivor} (Recommended)** — close the duplicate issue with a comment linking to the survivor
+- **Close #{survivor} as duplicate of #{duplicate}** — close the other one instead (if the newer issue is better scoped)
+- **Keep both** — they look similar but are actually distinct; leave them open
+
+If the user chooses to close a duplicate:
+1. Post a comment on the issue being closed: `Closing as duplicate of #{survivor}.`
+2. Close the issue using `mcp__gitea__edit_issue` with `state: "closed"`
+3. Remove the closed issue from the triage results
+
+If there are no duplicates detected, skip this step silently.
 
 ## Step 6: Score and rank actionable issues
 
