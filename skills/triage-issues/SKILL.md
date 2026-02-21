@@ -25,11 +25,21 @@ Extract `owner` and `repo` from the argument.
 
 Use `mcp__gitea__list_repo_issues` with `state: "open"` to get all open issues. If there are more than 100, paginate (increment `page`) until all are fetched.
 
-## Step 3: Fetch milestones
+## Step 3: Fetch open PRs
+
+Use `mcp__gitea__list_repo_pull_requests` with `state: "open"` to get all open pull requests. For each PR, note:
+- PR number and title
+- Head branch
+- Whether it's mergeable (`mergeable` field)
+- Number of comments
+
+Filter out any PRs that also appeared in the Step 2 issues list (Gitea returns PRs in the issues endpoint too — match by `pull_request` field being present and skip those from the issues list).
+
+## Step 4: Fetch milestones
 
 Use `mcp__gitea__list_milestones` with `state: "open"` to get active milestones and their due dates.
 
-## Step 4: Classify issues
+## Step 5: Classify issues
 
 For each open issue, determine if it is **blocked** or **actionable**.
 
@@ -40,7 +50,9 @@ An issue is **blocked** if any of these are true:
 
 Everything else is **actionable**.
 
-## Step 5: Score and rank actionable issues
+Additionally, note issues with `status: in-progress` or `status: in-review` labels — these are already being worked on. Include them in the output but deprioritize them (they will receive a scoring penalty in Step 6).
+
+## Step 6: Score and rank actionable issues
 
 Score each actionable issue using these factors (higher = tackle sooner):
 
@@ -54,11 +66,12 @@ Score each actionable issue using these factors (higher = tackle sooner):
 | Low complexity signal | +1 | Body is under 500 characters (likely a small task) |
 | High complexity signal | -1 | Body is over 2000 characters (likely a big task) |
 | Already assigned | -2 | Someone else may be working on it |
+| In progress or in review | -3 | Has `status: in-progress` or `status: in-review` label |
 | Oldest issue | +1 | Created more than 30 days ago (avoid staleness) |
 
 Break ties by issue number (lower = older = higher priority).
 
-## Step 6: Present results
+## Step 7: Present results
 
 Output a report in this format:
 
@@ -66,6 +79,17 @@ Output a report in this format:
 ## {repo} Issue Triage
 
 **{N} open issues** — {actionable_count} actionable, {blocked_count} blocked
+
+### Open PRs
+
+| PR | Title | Branch | Mergeable | Comments |
+|----|-------|--------|-----------|----------|
+| #{number} | {title} | {head_branch} | {Yes/No/Conflicts} | {comment_count} |
+
+If there are open PRs, show this section with a note:
+> These PRs should be reviewed/merged before starting new work. Run `/review-pr {repo}#{number}` to review, or `/merge-prs {repo}` to merge ready PRs.
+
+If no open PRs, omit this section.
 
 ### Recommended Next
 
