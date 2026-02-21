@@ -91,9 +91,16 @@ If there are more actionable issues beyond the top 5, list them briefly:
 - #{index} {title} ({labels})
 ```
 
-### Tips in the output
+### Top Recommendation Detail
 
-After the table, add a one-liner like:
-> Run `/do-issue {repo}#{top_issue_index}` to start working on the top recommendation.
+After everything else, show the full details of the #1 recommended issue so the user sees it last (closest to their cursor, no scrolling needed):
+
+```
+### Up Next: #{index} {title}
+
+{issue body — render the full body as-is}
+
+> Run `/do-issue {repo}#{index}` to start working on this issue.
+```
 
 Keep the output concise. No fluff.
