@@ -39,6 +39,9 @@ Gather every comment on the PR from three sources:
 2. **Top-level PR comments:** Use `mcp__gitea__get_issue_comments_by_index` to get non-review comments on the PR thread.
 
 Collect all comments into a single list with these fields per comment:
+- `id` (comment ID — needed for resolving later)
+- `review_id` (the parent review ID, if inline comment)
+- `review_state` (the parent review's state: `APPROVED`, `REQUEST_CHANGES`, `COMMENT`)
 - `path` (file path, if inline comment; empty for top-level)
 - `position` (line position, if inline)
 - `body` (comment text)
@@ -106,11 +109,30 @@ Follow the repo's AGENTS.md coding standards when making changes.
    - **IMPORTANT:** Per AGENTS.md Rule 3 — NO Claude/AI/co-authored-by references in commit messages
 3. Push to the head branch: `git push origin {head_branch}`
 
-## Step 10: Report
+## Step 10: Resolve addressed comments
+
+After pushing, mark addressed comments as resolved on the PR:
+
+1. **Reply to each inline comment** that was addressed: use `mcp__gitea__create_issue_comment` to post a brief top-level comment summarizing which comments were fixed and the commit SHA. Format:
+
+   ```
+   Addressed review comments in {commit_sha}:
+   - {path}:{position} — {brief description of fix}
+   - {path}:{position} — {brief description of fix}
+   ```
+
+2. **Dismiss `REQUEST_CHANGES` reviews** that are now fully addressed: use `mcp__gitea__dismiss_pull_request_review` with the `review_id` from Step 3 and message `"All requested changes addressed in {commit_sha}"`. Only dismiss reviews where **every** inline comment from that review was addressed.
+
+   Do NOT dismiss reviews where some comments were skipped — those still need attention.
+
+3. **Re-request review** (optional): if the review was from `code-review-agent` and changes were significant, note in the report that the user may want to re-run `/review-pr` to verify.
+
+## Step 11: Report
 
 Tell the user:
 1. **Summary of changes** — what was modified and why
 2. **Comments addressed** — list each comment that was fixed
 3. **Comments skipped** — any comments not addressed, with reasons
-4. **Issues created** — links to any new Gitea issues
-5. **Files changed** — list of modified files
+4. **Reviews dismissed** — list any `REQUEST_CHANGES` reviews that were dismissed
+5. **Issues created** — links to any new Gitea issues
+6. **Files changed** — list of modified files
