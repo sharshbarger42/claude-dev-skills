@@ -1,0 +1,116 @@
+---
+name: fix-pr
+description: Fetch all comments on a Gitea PR, classify them, implement fixes, commit, and push. Handles both user directives and review-agent suggestions.
+---
+
+# Fix PR Skill
+
+Address all review comments on a Gitea pull request: fetch comments, classify by source, implement fixes, and push to the PR branch.
+
+**Input:** PR reference as the skill argument. Accepted formats:
+- Shorthand: `food-automation#34`
+- Owner/repo: `super-werewolves/food-automation#34`
+- Full URL: `https://git.home.superwerewolves.ninja/super-werewolves/food-automation/pulls/34`
+
+## Step 1: Parse the PR reference
+
+Extract `owner`, `repo`, and PR `index` from the argument.
+
+### Repo resolution
+
+!`cat $HOME/gitea-repos/development-skills/lib/resolve-repo.md`
+
+## Step 2: Fetch PR metadata
+
+Use `mcp__gitea__get_pull_request_by_index` with the parsed `owner`, `repo`, and `index` to get:
+- Title, body
+- Head branch (this is the branch we'll check out and push to)
+- Base branch
+- Default branch (`base.repo.default_branch`)
+
+If the PR is not found, report the error and stop.
+
+## Step 3: Fetch all comments
+
+Gather every comment on the PR from three sources:
+
+1. **Review comments (inline):** Use `mcp__gitea__list_pull_request_reviews` to get all reviews. For each review, use `mcp__gitea__list_pull_request_review_comments` to get the inline comments (these have `path`, `position`, and `body`).
+
+2. **Top-level PR comments:** Use `mcp__gitea__get_issue_comments_by_index` to get non-review comments on the PR thread.
+
+Collect all comments into a single list with these fields per comment:
+- `path` (file path, if inline comment; empty for top-level)
+- `position` (line position, if inline)
+- `body` (comment text)
+- `user.login` (who posted it)
+- `source` (see Step 4)
+
+## Step 4: Classify comments
+
+Split comments by `user.login`:
+
+- **User comments** — any comment where `user.login` is NOT `code-review-agent`. These are directives and MUST be addressed. Top priority.
+- **Review agent comments** — comments where `user.login` IS `code-review-agent`. These are suggestions and SHOULD be addressed.
+
+**Threading:** Group comments that share the same `path` + `position`. When a user replies to a review-agent comment on the same path/position, the user's reply modifies or overrides the agent's suggestion — use the user's intent.
+
+For each actionable comment, extract:
+- `path` — file to change
+- `position` — where in the file
+- `body` — what to do
+- `source` — `user` or `review-agent`
+- `action` — what change is needed (fix code, create issue, etc.)
+
+## Step 5: Read repo AGENTS.md
+
+Use `mcp__gitea__get_file_content` to fetch `AGENTS.md` from the repo's default branch (from Step 2 metadata — do NOT hardcode `master` or `main`).
+
+If AGENTS.md doesn't exist, note that no repo-specific coding standards were found and proceed without it.
+
+## Step 6: Present summary and confirm
+
+Show the user a summary:
+- Count: **X user comments**, **Y review-agent comments**
+- Brief description of each comment and the proposed fix
+- Any comments that request issue creation (e.g., "create a ticket for X")
+- Any comments you plan to skip and why
+
+Use `AskUserQuestion` to get confirmation. **Do NOT start coding until the user confirms.**
+
+## Step 7: Set up workspace
+
+Run these commands using the Bash tool:
+
+1. `cd` to the local repo path from the shorthand table
+2. Verify the directory exists — if not, tell the user to clone the repo first and stop
+3. `git fetch origin`
+4. `git checkout {head_branch} && git pull origin {head_branch}`
+5. Verify clean working tree (`git status --porcelain`) — if dirty, warn the user and ask how to proceed
+
+No new branch creation — we push directly to the existing PR branch.
+
+## Step 8: Implement the changes
+
+Read the relevant files and address each comment:
+
+1. **User comments first** (top priority) — implement exactly what the user asked for
+2. **Review-agent comments second** — implement the suggested improvements
+3. **Issue creation** — for comments that say "create a ticket for X" or similar, use `mcp__gitea__create_issue` to create the issue in the appropriate repo
+
+Follow the repo's AGENTS.md coding standards when making changes.
+
+## Step 9: Commit and push
+
+1. Stage changed files individually (`git add <file1> <file2> ...` — NOT `git add -A` or `git add .`)
+2. Commit with message format: `fix(#{pr_index}): address PR review — {brief summary}`
+   - **IMPORTANT:** Per AGENTS.md Rule 3 — NO Claude/AI/co-authored-by references in commit messages
+3. Push to the head branch: `git push origin {head_branch}`
+
+## Step 10: Report
+
+Tell the user:
+1. **Summary of changes** — what was modified and why
+2. **Comments addressed** — list each comment that was fixed
+3. **Comments skipped** — any comments not addressed, with reasons
+4. **Issues created** — links to any new Gitea issues
+5. **Files changed** — list of modified files
