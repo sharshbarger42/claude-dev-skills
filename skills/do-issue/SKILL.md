@@ -57,6 +57,9 @@ Run these commands using the Bash tool:
 6. Create a feature branch: `git checkout -b feature/{index}-{short-slug}`
    - `short-slug`: lowercase, hyphenated, 3-5 words from the issue title (e.g., `add-tandoor-recipe-integration`)
 7. Verify the branch was created with `git branch --show-current`
+8. **Update status label:** Add `status: in-progress` to the issue and remove `status: backlog` if present.
+
+!`cat $HOME/gitea-repos/development-skills/lib/status-labels.md`
 
 **If the feature branch already exists**, ask the user whether to continue on it or delete and recreate it.
 
@@ -89,6 +92,8 @@ Use `mcp__gitea__create_pull_request` with:
   - `Closes #{index}` to auto-close the issue on merge
 - `head`: the feature branch name
 - `base`: the repo's default branch
+
+After creating the PR, **update the status label:** replace `status: in-progress` with `status: in-review` on the issue (see status-labels.md above for the swap procedure).
 
 ## Step 9: Run /review-pr
 
