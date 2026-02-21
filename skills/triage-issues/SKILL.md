@@ -123,8 +123,26 @@ After everything else, show the full details of the #1 recommended issue so the 
 ### Up Next: #{index} {title}
 
 {issue body — render the full body as-is}
-
-> Run `/do-issue {repo}#{index}` to start working on this issue.
 ```
+
+### Quick Actions
+
+The very last section of the output. List all runnable commands together so the user can copy-paste without scrolling.
+
+```
+### Quick Actions
+
+> `/review-pr {repo}#{pr_number}` — review PR #{pr_number}
+> `/merge-prs {repo}` — merge ready PRs
+> `/do-issue {repo}#{index}` — start #{index} {title}
+> `/do-issue {repo}#{index}` — start #{index} {title}
+> `/do-issue {repo}#{index}` — start #{index} {title}
+```
+
+Rules:
+- If there are open PRs, list `/review-pr` for each PR first, then `/merge-prs` once
+- Then list `/do-issue` for each of the top 5 recommended issues
+- If there are no open PRs, omit the PR commands
+- Each line is a blockquote so it renders as a distinct copyable block
 
 Keep the output concise. No fluff.
