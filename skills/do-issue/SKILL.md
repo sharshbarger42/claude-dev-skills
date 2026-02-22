@@ -130,7 +130,26 @@ Responding to review comments:
 - For "separate issue" items: create the Gitea issue immediately using `mcp__gitea__create_issue`, link back to this PR
 - For "won't fix" items: no action needed
 
-## Step 11: Report
+## Step 11: Update documentation
+
+After the code changes are finalized, check if the repo's README or other user-facing docs need updating to reflect the new functionality.
+
+1. Read the repo's `README.md` (use `mcp__gitea__get_file_content` or the local file)
+2. Check whether the changes from this issue introduce:
+   - New commands, endpoints, or features that users interact with
+   - New configuration options
+   - Changes to existing behavior that's documented
+3. If docs need updating:
+   - Create a new branch from the default branch: `docs/{index}-update-readme` (or similar)
+   - Make the edits (add new commands to examples, add endpoints to API section, update project structure, etc.)
+   - Commit with format: `docs(#{index}): {short description}`
+   - Push and create a PR
+   - Wait for CI, then merge (or leave for `/merge-prs` if CI takes too long)
+4. If no docs changes are needed, skip this step silently
+
+**Keep doc changes minimal and focused** — only document what this issue added. Don't rewrite unrelated sections.
+
+## Step 12: Report
 
 Tell the user:
 1. **PR URL** — link to the new pull request
@@ -138,3 +157,4 @@ Tell the user:
 3. **Summary of changes** — what was implemented
 4. **Review results** — findings from `/review-pr`
 5. **Review triage** — what was fixed, what became new issues, what was declined
+6. **Docs** — whether README/docs were updated (and PR link if so)
