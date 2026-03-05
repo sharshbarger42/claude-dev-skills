@@ -208,6 +208,7 @@ Use this mapping to determine if a merged repo has a deploy-on-merge workflow:
 |------|----------------|--------------|
 | `food-automation` | `deploy.yaml` | `curl -s http://food.baryonyx-walleye.ts.net/health` |
 | `homelab-setup` | `deploy.yml` | `scripts/check-managed.sh` (exit code) |
+| `multi-agent-coordinator` | `deploy.yml` | None (placeholder — pending K3s cluster setup) |
 
 If the merged repo is NOT in this table, skip to Step 10 for that PR.
 
