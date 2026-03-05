@@ -17,6 +17,8 @@ Read `~/AGENTS.md` — this is the source of truth for:
 - SSH access patterns
 - Security rules and constraints
 
+If `~/AGENTS.md` does not exist, fall back to `AGENTS.md` in the current working directory.
+
 Do NOT summarize the whole file — just internalize it.
 
 ### Step 2: Repo orientation (if repo argument provided)
