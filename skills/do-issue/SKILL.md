@@ -68,19 +68,17 @@ Present the user with:
 
 Use `AskUserQuestion` to get the user's confirmation or refinement before writing any code. **Do NOT start coding until the user confirms.**
 
-## Step 5: Set up workspace
+## Step 5: Set up workspace (worktree isolation)
 
-Run these commands using the Bash tool:
+Use worktree isolation so the main working tree stays clean:
 
-1. `cd` to the local repo path from the shorthand table
-2. Verify the directory exists — if not, tell the user to clone the repo first and stop
-3. `git fetch origin`
-4. Check for dirty working tree (`git status --porcelain`). If dirty, warn the user and ask how to proceed
-5. `git checkout {default_branch} && git pull origin {default_branch}`
-6. Create a feature branch: `git checkout -b feature/{index}-{short-slug}`
+1. Verify the local repo path from the shorthand table exists — if not, tell the user to clone the repo first and stop
+2. Use the `EnterWorktree` tool with `name: {index}-{short-slug}` to create an isolated worktree
    - `short-slug`: lowercase, hyphenated, 3-5 words from the issue title (e.g., `add-tandoor-recipe-integration`)
-7. Verify the branch was created with `git branch --show-current`
-8. **Update status label:** Add `status: in-progress` to the issue and remove `status: backlog` if present.
+   - This creates a new branch and switches the session's working directory to the worktree
+3. Verify you're in the worktree with `git branch --show-current` and `pwd`
+4. Rename the branch to follow convention: `git branch -m feature/{index}-{short-slug}`
+5. **Update status label:** Add `status: in-progress` to the issue and remove `status: backlog` if present.
 
 !`cat $HOME/gitea-repos/development-skills/lib/status-labels.md`
 
@@ -104,6 +102,8 @@ Read relevant files, write code, edit files. Do the actual implementation work h
 2. Commit using the repo's commit format from AGENTS.md. Typical format: `feat(#{index}): short description`
    - **IMPORTANT:** Per AGENTS.md Rule 3 — NO Claude/AI/co-authored-by references in commit messages
 3. Push the feature branch: `git push -u origin feature/{index}-{short-slug}`
+
+The worktree will be automatically cleaned up when the session ends (you'll be prompted to keep or remove it).
 
 ## Step 8: Create PR
 
