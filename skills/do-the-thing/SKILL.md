@@ -34,6 +34,18 @@ Infer the repo from the current working directory:
    - Option 2: **Different repo** — user types the shorthand name
 4. If no match is found (not in a git repo, or remote doesn't match any known repo), use `AskUserQuestion` to ask which repo to use, listing all repos from the shorthand table as options
 
+## Step 1b: Establish identity and discover active work
+
+!`cat $HOME/gitea-repos/development-skills/lib/agent-identity.md`
+
+Derive your `AGENT_NAME` for this session.
+
+!`cat $HOME/gitea-repos/development-skills/lib/agent-coordination.md`
+
+!`cat $HOME/gitea-repos/development-skills/lib/discord-notify.md`
+
+Use the **Query Active Work** procedure from `agent-coordination.md` to discover what other agents are currently working on in this repo. Store the list of active items (issue index, agent name, started timestamp, staleness flag) for use in Step 3.
+
 ## Step 2: Triage issues
 
 Invoke the triage skill:
@@ -52,7 +64,15 @@ Read the triage output carefully. It will contain:
 
 ## Step 3: Ask the user which issue to work on
 
-Use `AskUserQuestion` to let the user pick an issue. Present the top recommended issues from the triage output as options:
+**Exclude in-progress issues:** Remove any issues from the triage recommendations that are currently being worked on by another agent (from the active work list in Step 1b). These should not appear as options.
+
+If there are active items from Step 1b, show a note before the options:
+> **Other agents currently working on:**
+> - #{index} {title} — {agent_name} (started {relative_time}, {stale_warning if applicable})
+
+If any active item is flagged as possibly stale (>2h), append to that line: `(possibly stale — no completion after {duration})`
+
+Use `AskUserQuestion` to let the user pick an issue. Present the top recommended issues (excluding in-progress ones) from the triage output as options:
 
 - Option 1: **#{index} {title}** (the #1 recommended issue) — with description: "{1-line reason from triage}"
 - Option 2: **#{index} {title}** (the #2 recommended issue) — with description: "{1-line reason from triage}"
@@ -115,6 +135,8 @@ This will:
 
 ## Step 7: Report
 
+**Discord notification:** Post a "Loop Complete" Discord notification using the gold embed template from `discord-notify.md`. Include the repo, issue, PR, and final status. Best-effort — skip silently if webhook is not configured.
+
 Present a final summary of the entire loop:
 
 ```
@@ -124,6 +146,7 @@ Present a final summary of the entire loop:
 **Issue:** #{issue_index} — {issue_title}
 **PR:** #{pr_index} — {pr_title}
 **Status:** Merged and deployed
+**Agent:** {AGENT_NAME}
 
 ### What happened
 1. Triaged {N} open issues in {repo}

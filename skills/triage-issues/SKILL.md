@@ -52,7 +52,7 @@ Separately, flag issues that appear to be **duplicates** of each other — these
 
 Everything else is **actionable**.
 
-Additionally, note issues with `status: in-progress` or `status: in-review` labels — these are already being worked on. Include them in the output but deprioritize them (they will receive a scoring penalty in Step 6).
+Additionally, **exclude** issues with `status: in-progress` or `status: in-review` labels entirely from the recommended list — these are already being worked on and should not be suggested. Track them separately for the "Currently Active" section in Step 7.
 
 ## Step 5b: Detect duplicates
 
@@ -92,7 +92,6 @@ Score each actionable issue using these factors (higher = tackle sooner):
 | Low complexity signal | +1 | Body is under 500 characters (likely a small task) |
 | High complexity signal | -1 | Body is over 2000 characters (likely a big task) |
 | Already assigned | -2 | Someone else may be working on it |
-| In progress or in review | -3 | Has `status: in-progress` or `status: in-review` label |
 | Oldest issue | +1 | Created more than 30 days ago (avoid staleness) |
 
 Break ties by issue number (lower = older = higher priority).
@@ -126,6 +125,21 @@ If no open PRs, omit this section.
 | 3 | ★☆☆ | #{index} {title} | {labels} | {milestone or —} | {1-line reason} |
 
 Show up to 5 recommended issues. Use ★ to indicate relative priority (★★★ = highest).
+
+### Currently Active
+
+Show issues that are currently being worked on (have `status: in-progress` or `status: in-review` labels). If Agent Mail is available, query for richer context:
+
+!`cat $HOME/gitea-repos/development-skills/lib/agent-coordination.md`
+
+Use the **Query Active Work** procedure to get agent names and timestamps.
+
+| Issue | Status | Agent | Started | Note |
+|-------|--------|-------|---------|------|
+| #{index} {title} | in-progress | {agent_name or "unknown"} | {relative_time} | {stale_warning if >2h} |
+| #{index} {title} | in-review | — | — | PR open |
+
+If no issues are currently active, omit this section.
 
 ### Blocked
 
