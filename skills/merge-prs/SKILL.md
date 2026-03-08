@@ -99,45 +99,77 @@ If no PRs are ready, report this and stop.
 
 ## Step 6: Merge
 
-### Read Gitea token
-
-Extract the user's Gitea token from `~/.claude.json`:
-
-```bash
-jq -r '.mcpServers.gitea.args | to_entries[] | select(.value == "-token") | .key + 1 | tostring' ~/.claude.json | xargs -I{} jq -r ".mcpServers.gitea.args[{}]" ~/.claude.json
-```
-
-If the token cannot be extracted, stop and tell the user:
-> Could not find Gitea token in `~/.claude.json`. Ensure the gitea MCP server is configured with a `-token` argument.
-
-### Verify auth
-
-Call `mcp__gitea__get_my_user_info` to confirm the token is valid and note the authenticated username.
-
 ### Merge each PR
 
 For each selected PR, determine the merge strategy:
 - Use `base.repo.default_merge_style` from the PR metadata if available
 - Fall back to `rebase` if not set
 
-Read the Gitea API URL from the infrastructure config:
+### Compose squash commit message (squash merges only)
 
-!`cat $HOME/gitea-repos/development-skills/config/infrastructure.md`
+When the merge style is `squash`, compose a custom commit title and body. Do NOT use the Gitea default (which dumps the PR description and all commit messages).
 
-Merge via the Gitea REST API using the Bash tool:
-
-```bash
-curl -s -X POST \
-  -H "Authorization: token {GITEA_TOKEN}" \
-  -H "Content-Type: application/json" \
-  "{GITEA_API_URL}/repos/{owner}/{repo}/pulls/{index}/merge" \
-  -d '{"Do": "{merge_style}", "delete_branch_after_merge": true}'
+**Title format:** Follow the repo's conventional commit format:
+```
+type(#issue): short description
 ```
 
-Check the HTTP response:
-- **200/204**: merge succeeded
-- **405**: merge not allowed (conflicts, branch protection, etc.) — report the error and skip
-- **409**: conflict — report and skip
+To build the title:
+1. Use the PR title if it already follows the `type(#N): description` format
+2. Otherwise, derive the type from the PR content:
+   - `feat` — new functionality
+   - `fix` — bug fix
+   - `refactor` — restructuring without behavior change
+   - `docs` — documentation only
+   - `chore` — maintenance, deps, CI
+3. Extract the issue number from the PR branch name (`feature/{index}-*`) or PR body (`Closes #N`)
+4. Write a concise description (imperative mood, lowercase, no period)
+
+**Body format:** Summarize what the final PR accomplishes — NOT a list of every intermediate commit. Exclude iterative fix-up commits (e.g., "address review comments", "fix lint", "fix CI"). Focus on the end result:
+
+```
+Summary of the meaningful changes:
+- Added X to handle Y
+- Updated Z configuration for W
+- Removed deprecated Q
+
+Closes #{issue_number}
+```
+
+To build the body:
+1. Fetch the PR diff with `mcp__gitea__get_pull_request_diff`
+2. Read the PR's commit list from `mcp__gitea__list_repo_commits` (filter by the PR branch)
+3. Identify the substantive changes from the diff — group by component/area
+4. Write 2-6 bullet points summarizing what changed and why
+5. Append `Closes #N` if an issue number is linked
+
+**Example:**
+
+For a PR titled `feat(#114): add K8s manifests for multi-agent-coordinator` with 5 commits (initial implementation + 4 review fixes):
+
+```
+Title: feat(#114): add K8s manifests for multi-agent-coordinator
+
+Body:
+- Add deployment, service, ingress, and networkpolicy for API and frontend
+- Add SOPS-encrypted secret for application credentials
+- Configure shared-api-keys replication to multi-agent-coordinator namespace
+- Add DNS zone entry for multi-agent-coordinator.apps.superwerewolves.ninja
+
+Closes #114
+```
+
+### Send the merge request
+
+Use `mcp__gitea__merge_pull_request` with:
+- `owner`, `repo`, `index` from the PR metadata
+- `merge_style`: the determined merge strategy
+- `delete_branch`: `true`
+- For squash merges, also pass:
+  - `title`: the composed squash commit title
+  - `message`: the composed squash commit body
+
+If the merge fails, report the error and skip to the next PR.
 
 Record the merge timestamp for each successfully merged PR.
 
