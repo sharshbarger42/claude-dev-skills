@@ -207,7 +207,7 @@ Use this mapping to determine if a merged repo has a deploy-on-merge workflow:
 | Repo | Deploy workflow | Health check |
 |------|----------------|--------------|
 | `food-automation` | `deploy.yaml` | `curl -s http://food.baryonyx-walleye.ts.net/health` |
-| `homelab-setup` | `deploy.yml` | None (infrastructure) |
+| `homelab-setup` | `deploy.yml` | `scripts/check-managed.sh` (exit code) |
 
 If the merged repo is NOT in this table, skip to Step 10 for that PR.
 
@@ -232,15 +232,17 @@ If no deploy run is found after 5 minutes, note this as "deploy not triggered" a
 Run the repo-specific health check from the table in Step 7:
 
 - **food-automation**: `curl -s http://food.baryonyx-walleye.ts.net/health` via Bash — verify the response contains `"status"` with value `"ok"` and services show `"ready"`
-- **homelab-setup**: Skip (no single health endpoint)
+- **homelab-setup**: Run `scripts/check-managed.sh` from the local repo checkout via Bash. The script checks K3s nodes, Flux CD kustomizations, and all apps listed in `k8s/apps/kustomization.yaml`. Parse the last line of stdout as JSON: `{"healthy": bool, "nodes": int, "apps": [...], "failed": [...]}`. Healthy = exit code 0.
 
-If the health check **fails** (non-200 response, status not ok, or services not ready), create a Gitea issue:
+If the health check **fails** (non-200 response, status not ok, services not ready, or script exits non-zero), create a Gitea issue:
 ```
 Title: Health check failed after merging #{pr_index}
 Body: PR #{pr_index} ({pr_title}) was merged and the deploy workflow completed successfully,
-      but the health check at {health_url} returned an unexpected response:
+      but the health check returned an unexpected response:
 
-      {response_body}
+      {response_body_or_script_output}
+
+      Failed items: {failed_list}
 
       Investigate and fix.
 Labels: bug
