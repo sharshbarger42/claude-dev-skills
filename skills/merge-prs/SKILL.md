@@ -34,7 +34,9 @@ For each repo in scope, call `mcp__gitea__list_repo_pull_requests` with `state: 
 
 If a repo has no open PRs, skip it and note that in the final report.
 
-Collect all open PRs into a working list with: `owner`, `repo`, `index`, `title`, `head.label` (branch name), `head.sha` (commit SHA), `user.login` (PR author), and `base.repo.default_merge_style`.
+Collect all open PRs into a working list with: `owner`, `repo`, `index`, `title`, `head.label` (branch name), `head.sha` (commit SHA), and `user.login` (PR author).
+
+Also count the number of commits in each PR by calling `mcp__gitea__list_repo_commits` filtered to the PR's head branch (commits since the merge base). Record the commit count for each PR.
 
 ## Step 3: Check if review comments are addressed
 
@@ -82,9 +84,10 @@ Present a summary table of ALL open PRs across all scanned repos:
 ```
 ## PRs Ready to Merge
 
-| Repo | PR | Title | Reviews | CI | Merge Style |
-|------|----|-------|---------|----|-------------|
-| food-automation | #39 | refactor: enforce layer boundary | All addressed | Passed | rebase |
+| Repo | PR | Title | Commits | Reviews | CI | Merge Style |
+|------|----|-------|---------|---------|----|----|
+| food-automation | #39 | refactor: enforce layer boundary | 1 | All addressed | Passed | rebase |
+| homelab-setup | #45 | feat(#40): add monitoring stack | 3 | All addressed | Passed | squash |
 
 ## PRs Not Ready
 
@@ -101,13 +104,13 @@ If no PRs are ready, report this and stop.
 
 ### Merge each PR
 
-For each selected PR, determine the merge strategy:
-- Use `base.repo.default_merge_style` from the PR metadata if available
-- Fall back to `rebase` if not set
+For each selected PR, determine the merge strategy based on commit count (ignore the repo's `default_merge_style`):
+- **1 commit** → `rebase` (clean single commit, no squash needed)
+- **2+ commits** → `squash` (collapse into one clean commit with a composed message)
 
-### Compose squash commit message (squash merges only)
+### Compose squash commit message (multi-commit PRs only)
 
-When the merge style is `squash`, compose a custom commit title and body. Do NOT use the Gitea default (which dumps the PR description and all commit messages).
+For PRs being squash-merged, compose a custom commit title and body. Do NOT use the Gitea default (which dumps the PR description and all commit messages).
 
 **Title format:** Follow the repo's conventional commit format:
 ```
@@ -264,9 +267,9 @@ For each PR that was in scope, report its final status:
 
 | Repo | PR | Title | Merge | Deploy | Health | Issue |
 |------|----|-------|-------|--------|--------|-------|
-| food-automation | #39 | refactor: enforce layer boundary | Merged (rebase) | Passed | Healthy | — |
-| homelab-setup | #12 | feat: add backup | Merged (rebase) | Failed | — | #45 created |
-| recipe-readiness | #8 | fix: parser edge case | Merged (rebase) | N/A | N/A | — |
+| food-automation | #39 | refactor: enforce layer boundary | Merged (rebase, 1 commit) | Passed | Healthy | — |
+| homelab-setup | #45 | feat(#40): add monitoring stack | Merged (squash, 3→1) | Failed | — | #46 created |
+| recipe-readiness | #8 | fix: parser edge case | Merged (rebase, 1 commit) | N/A | N/A | — |
 | food-automation | #40 | feat: new endpoint | Skipped | — | — | — (2 unaddressed comments) |
 ```
 
