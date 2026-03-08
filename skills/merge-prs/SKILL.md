@@ -176,6 +176,12 @@ If the merge fails, report the error and skip to the next PR.
 
 Record the merge timestamp for each successfully merged PR.
 
+**Discord notification:** After each successful merge, post a "PR Merged" Discord notification using the green embed template:
+
+!`cat $HOME/gitea-repos/development-skills/lib/discord-notify.md`
+
+Read the webhook URL from `~/.config/development-skills/discord-webhook`. If the file doesn't exist, skip silently. Include the PR title, repo, PR number, and merge style in the notification. Use your agent name (derive it once at the start of the skill using the agent identity logic from `agent-identity.md`).
+
 ### Update local branch
 
 After merging, if the current working directory is inside the merged repo (check with `git remote get-url origin`), update the local default branch to match:

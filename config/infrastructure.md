@@ -41,6 +41,16 @@ IPs, domains, and service URLs for the homelab environment.
 | Authentik (SSO) | — | — | — |
 | Flywheel | — | — | — |
 
+## Notifications
+
+| Name | Value |
+|------|-------|
+| Discord webhook file | `~/.config/development-skills/discord-webhook` |
+| Agent Mail thread prefix | `active-work-{repo}` |
+| Agent registry thread | `agent-registry` |
+
+The Discord webhook file should contain a single line with the Discord webhook URL. Create it with `chmod 600`. If the file does not exist, Discord notifications are silently skipped.
+
 ## DNS Check Domains
 
 These subdomains should all resolve to the NPM IP (`192.168.0.140`) via Pi-hole:

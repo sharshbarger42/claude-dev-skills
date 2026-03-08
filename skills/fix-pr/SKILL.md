@@ -20,6 +20,20 @@ Extract `owner`, `repo`, and PR `index` from the argument.
 
 !`cat $HOME/gitea-repos/development-skills/lib/resolve-repo.md`
 
+## Step 1b: Establish identity and register active work
+
+!`cat $HOME/gitea-repos/development-skills/lib/agent-identity.md`
+
+Derive your `AGENT_NAME` for this session.
+
+!`cat $HOME/gitea-repos/development-skills/lib/agent-coordination.md`
+
+Register active work on this PR using the **Register Active Work** procedure from `agent-coordination.md`. Use the PR index as the issue index and the PR title as the issue title.
+
+!`cat $HOME/gitea-repos/development-skills/lib/discord-notify.md`
+
+Post a "Started Work" Discord notification for this PR.
+
 ## Step 2: Fetch PR metadata
 
 Use `mcp__gitea__get_pull_request_by_index` with the parsed `owner`, `repo`, and `index` to get:
@@ -154,6 +168,8 @@ After pushing, mark addressed comments as resolved on the PR:
 3. **Re-request review** (optional): if the review was from `code-review-agent` and changes were significant, note in the report that the user may want to re-run `/review-pr` to verify.
 
 ## Step 11: Report
+
+**Deregister active work:** Send an Agent Mail completion message using the **Deregister Active Work** procedure from `agent-coordination.md`. Post a Discord notification. Best-effort — skip silently if unavailable.
 
 Tell the user:
 1. **Summary of changes** — what was modified and why

@@ -20,6 +20,29 @@ Extract `owner`, `repo`, and issue `index` from the argument.
 
 !`cat $HOME/gitea-repos/development-skills/lib/resolve-repo.md`
 
+## Step 1b: Establish identity and check for conflicts
+
+!`cat $HOME/gitea-repos/development-skills/lib/agent-identity.md`
+
+Derive your `AGENT_NAME` for this session.
+
+Then check if another agent is already working on this issue:
+
+1. Fetch the issue's current labels. If `status: in-progress` is present, another agent may already be on it.
+2. If Agent Mail is available, query for active work on this issue:
+
+!`cat $HOME/gitea-repos/development-skills/lib/agent-coordination.md`
+
+Use the **Query Active Work** procedure from `agent-coordination.md`, filtered to this specific issue.
+
+3. If a conflict is found (label set AND Agent Mail shows another agent):
+   - Warn the user: `"Issue #{INDEX} appears to be in-progress by {OTHER_AGENT} (started {TIMESTAMP}). Continue anyway?"`
+   - Use `AskUserQuestion` with options: **Continue anyway**, **Pick a different issue**
+   - If the user says pick a different issue, stop and suggest running `/do-the-thing` instead
+4. If the `started` timestamp is >2h old with no completion message, note it as possibly stale in the warning
+
+If no conflict, proceed silently.
+
 ## Step 2: Fetch issue metadata
 
 Use `mcp__gitea__get_issue_by_index` with the parsed `owner`, `repo`, and `index` to get:
@@ -61,6 +84,8 @@ Run these commands using the Bash tool:
 
 !`cat $HOME/gitea-repos/development-skills/lib/status-labels.md`
 
+9. **Register active work:** After setting `status: in-progress`, register via Agent Mail and post a "Started Work" Discord notification using the procedures from `agent-coordination.md` and `discord-notify.md` (loaded in Step 1b). This is best-effort — if either fails, continue.
+
 **If the feature branch already exists**, ask the user whether to continue on it or delete and recreate it.
 
 ## Step 6: Implement the changes
@@ -94,6 +119,8 @@ Use `mcp__gitea__create_pull_request` with:
 - `base`: the repo's default branch
 
 After creating the PR, **update the status label:** replace `status: in-progress` with `status: in-review` on the issue (see status-labels.md above for the swap procedure).
+
+**Discord notification:** Post a "PR Created" Discord notification using the purple embed template from `discord-notify.md`. Include the PR number, title, branch, and agent name. Best-effort — skip silently if webhook is not configured.
 
 ## Step 9: Run /review-pr
 
@@ -150,6 +177,8 @@ After the code changes are finalized, check if the repo's README or other user-f
 **Keep doc changes minimal and focused** — only document what this issue added. Don't rewrite unrelated sections.
 
 ## Step 12: Report
+
+**Deregister active work:** Send an Agent Mail completion message using the **Deregister Active Work** procedure from `agent-coordination.md`. Best-effort — skip silently if Agent Mail is unavailable.
 
 Tell the user:
 1. **PR URL** — link to the new pull request

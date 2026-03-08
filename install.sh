@@ -30,3 +30,12 @@ for srv in gitea tandoor obsidian grocy google kroger ersatztv; do
     echo "  MCP $srv: not configured"
   fi
 done
+
+echo ""
+echo "=== Optional: Multi-Agent Coordination ==="
+[[ -f "$HOME/.config/development-skills/discord-webhook" ]] && echo "  Discord webhook: OK" || echo "  Discord webhook: not configured (create ~/.config/development-skills/discord-webhook)"
+if grep -q "\"mcp-agent-mail\"" "$HOME/.mcp.json" 2>/dev/null || grep -q "\"mcp-agent-mail\"" "$HOME/.claude.json" 2>/dev/null; then
+  echo "  Agent Mail MCP: OK"
+else
+  echo "  Agent Mail MCP: not configured (optional — coordination falls back to Gitea labels only)"
+fi
