@@ -92,8 +92,16 @@ Collect all comments into a single list with these fields per comment:
 
 Split comments by `user.login`:
 
-- **User comments** — any comment where `user.login` is NOT `code-review-agent`. These are directives and MUST be addressed. Top priority.
-- **Review agent comments** — comments where `user.login` IS `code-review-agent`. These are suggestions and SHOULD be addressed.
+- **User comments** — any comment where `user.login` is NOT `code-review-agent`. These are directives and MUST be addressed. Top priority. User comments have no severity concept — they are always required.
+- **Review agent comments** — comments where `user.login` IS `code-review-agent`. Parse severity from the comment body.
+
+### Severity parsing (review-agent comments only)
+
+Scan the comment `body` for severity tags:
+- `[critical]` → required — treat same as user comments, must be fixed
+- `[warning]` → fix if straightforward, create issue if complex
+- `[nit]` → skip unless the fix is trivially mechanical (e.g., rename, whitespace)
+- No tag found → default to `warning` (backwards compatibility with older reviews)
 
 **Threading:** Group comments that share the same `path` + `position`. When a user replies to a review-agent comment on the same path/position, the user's reply modifies or overrides the agent's suggestion — use the user's intent.
 
@@ -102,7 +110,8 @@ For each actionable comment, extract:
 - `position` — where in the file
 - `body` — what to do
 - `source` — `user` or `review-agent`
-- `action` — what change is needed (fix code, create issue, etc.)
+- `severity` — `critical`, `warning`, or `nit` (user comments: always `required`)
+- `action` — what change is needed (fix code, create issue, skip, etc.)
 
 ## Step 5: Read repo AGENTS.md
 
@@ -113,10 +122,10 @@ If AGENTS.md doesn't exist, note that no repo-specific coding standards were fou
 ## Step 6: Present summary and confirm
 
 Show the user a summary:
-- Count: **X user comments**, **Y review-agent comments**
-- Brief description of each comment and the proposed fix
-- Any comments that request issue creation (e.g., "create a ticket for X")
-- Any comments you plan to skip and why
+- Count: **X user comments**, **Y bot critical**, **Z bot warnings**, **N bot nits**
+- Brief description of each comment and the proposed action (fix / create issue / skip)
+- Nits planned to skip (with reason: "nit — not trivially mechanical")
+- Warnings planned as issues (with reason: "complex — will create issue instead")
 
 Use `AskUserQuestion` to get confirmation. **Do NOT start coding until the user confirms.**
 
@@ -134,11 +143,13 @@ No new branch creation — we push directly to the existing PR branch.
 
 ## Step 8: Implement the changes
 
-Read the relevant files and address each comment:
+Read the relevant files and address comments in priority order:
 
-1. **User comments first** (top priority) — implement exactly what the user asked for
-2. **Review-agent comments second** — implement the suggested improvements
-3. **Issue creation** — for comments that say "create a ticket for X" or similar, use `mcp__gitea__create_issue` to create the issue in the appropriate repo
+1. **User comments** (always required) — implement exactly what the user asked for
+2. **Bot `[critical]`** (required) — treat same as user comments, must be fixed
+3. **Bot `[warning]`** (fix or defer) — fix if the change is straightforward. If complex (requires architectural changes, new dependencies, or significant refactoring), create a Gitea issue instead using `mcp__gitea__create_issue` with title `"[review] {brief description}"` and body referencing the PR
+4. **Bot `[nit]`** (skip unless trivial) — only fix if the change is purely mechanical (rename, whitespace, typo). Skip all others
+5. **Issue creation** — for comments that explicitly say "create a ticket for X" or similar, use `mcp__gitea__create_issue`
 
 Follow the repo's AGENTS.md coding standards when making changes.
 
@@ -171,10 +182,17 @@ After pushing, mark addressed comments as resolved on the PR:
 
 **Deregister active work:** Send an Agent Mail completion message using the **Deregister Active Work** procedure from `agent-coordination.md`. Post a Discord notification. Best-effort — skip silently if unavailable.
 
-Tell the user:
-1. **Summary of changes** — what was modified and why
-2. **Comments addressed** — list each comment that was fixed
-3. **Comments skipped** — any comments not addressed, with reasons
-4. **Reviews dismissed** — list any `REQUEST_CHANGES` reviews that were dismissed
-5. **Issues created** — links to any new Gitea issues
-6. **Files changed** — list of modified files
+Tell the user, grouped by outcome:
+
+### Addressed
+- `[severity] path:line` — description (fixed in commit)
+
+### Issues Created
+- `[warning] path:line` — description → Issue #N
+
+### Skipped
+- `[nit] path:line` — description (not trivially mechanical)
+
+Also report:
+- **Reviews dismissed** — list any `REQUEST_CHANGES` reviews that were dismissed
+- **Files changed** — list of modified files

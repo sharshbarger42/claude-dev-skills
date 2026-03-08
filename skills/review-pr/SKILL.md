@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: Review a Gitea PR using code-review-agent. Fetches diff, runs parallel security + architecture review, posts comments.
+description: Review a Gitea PR using code-review-agent. Fetches diff, runs a four-pass review with severity tiers, posts via MCP.
 ---
 
 # PR Review Skill
@@ -12,17 +12,7 @@ Review a Gitea pull request and post the review as `code-review-agent`.
 - Owner/repo: `super-werewolves/food-automation#32`
 - Full URL: `https://git.home.superwerewolves.ninja/super-werewolves/food-automation/pulls/32`
 
-## Step 1: Read token
-
-Read the code-review-agent token:
-!`cat $HOME/.config/code-review-agent/token 2>/dev/null || echo "MISSING"`
-
-If the token is `MISSING`, stop and tell the user:
-> code-review-agent token not found. Create it at `~/.config/code-review-agent/token` (chmod 600).
-
-Store the token value for use in Step 7.
-
-## Step 2: Parse the PR reference
+## Step 1: Parse the PR reference
 
 Extract `owner`, `repo`, and PR `index` from the argument.
 
@@ -30,184 +20,170 @@ Extract `owner`, `repo`, and PR `index` from the argument.
 
 !`cat $HOME/gitea-repos/development-skills/lib/resolve-repo.md`
 
-## Step 3: Fetch PR metadata
+## Step 2: Fetch PR metadata
 
 Use `mcp__gitea__get_pull_request_by_index` with the parsed `owner`, `repo`, and `index` to get:
 - PR title
 - PR body/description
 - Base and head branches
+- Default branch (`base.repo.default_branch`)
 
 If the PR is not found, report the error and stop.
 
-## Step 4: Fetch PR diff
+## Step 3: Fetch PR diff
 
 Use `mcp__gitea__get_pull_request_diff` with the same `owner`, `repo`, and `index`.
 
 If the diff is larger than 100KB, note this and focus the review on the largest changed files. Summarize smaller changes.
 
-## Step 5: Read repo AGENTS.md
+## Step 4: Extract review standards from AGENTS.md
 
-Use `mcp__gitea__get_file_content` to fetch `AGENTS.md` from the repo's default branch. Get the default branch name from the PR metadata (`base.repo.default_branch`) — do NOT hardcode `master` or `main`.
+1. Use `mcp__gitea__get_file_content` to fetch `AGENTS.md` from the repo's default branch (from Step 2 metadata — do NOT hardcode `master` or `main`).
+2. Look for the `## Code Review Standards` heading in the file content.
+3. Extract from that heading to the next `## ` heading or end of file.
+4. If the `## Code Review Standards` section is not found, fall back to the full AGENTS.md content.
+5. If no AGENTS.md exists at all, use: `"No repository-specific coding standards found."`
 
-If AGENTS.md doesn't exist, note that no repo-specific coding standards were found and proceed without it.
+Store the extracted text as `{review_standards}`.
 
-## Step 6: Launch review subagents
+## Step 5: Launch review subagent
 
-Launch **two** Task subagents **in parallel**:
-
-### Subagent 1: Security & Bug Review (`vern:paranoid`)
+Launch **one** Task subagent (`vern:paranoid` persona) that performs four sequential review passes.
 
 Prompt:
+
 ```
-You are reviewing a pull request for security issues, bugs, and correctness problems.
+You are reviewing a pull request. Perform four sequential review passes, "resetting your perspective" between each. For each pass, consult the relevant checklist section and tag every finding with a severity.
+
+## Severity Tags
+- **[critical]** — Security vulnerability, data loss risk, broken functionality, or correctness bug. Must be fixed before merge.
+- **[warning]** — Meaningful improvement: missing validation, poor error handling, design issue, standards violation. Should be fixed.
+- **[nit]** — Style, naming, minor readability. Fix if trivial, skip if not.
 
 ## PR: {title}
 {pr_body}
 
-## Repository Coding Standards
-{agents_md_content OR "No AGENTS.md found for this repository."}
+## Review Standards
+{review_standards}
 
 ## Diff
 {diff}
 
-Review this PR focusing on:
-- Security vulnerabilities (injection, auth issues, secrets exposure, unsafe operations)
-- Bugs and logic errors
-- Error handling gaps
-- Data validation issues
-- Race conditions or concurrency problems
-
-Produce your review in this exact format:
-
-## Summary
-[1-2 sentence overall security/correctness assessment]
-
-## Verdict
-APPROVE | REQUEST_CHANGES | COMMENT
-
-## Inline Comments
-- **path/to/file.py:LINE_NUMBER** — [specific issue with this line]
-
-## General Comments
-- [broader observations not tied to a specific line]
-
-IMPORTANT: For inline comments, the LINE_NUMBER must be the line number within the diff (the new_position — i.e., the line number in the new version of the file as shown in the diff's @@ hunk headers). Only comment on lines that appear in the diff.
+## Review Checklists
+```
+!`cat $HOME/gitea-repos/development-skills/lib/review-checklists.md`
 ```
 
-### Subagent 2: Architecture & Design Review (`vern:architect`)
+## Instructions
 
-Prompt:
-```
-You are reviewing a pull request for architecture, design, and code quality.
+Perform the four passes below in order. After each pass, mentally reset — approach the next pass as if seeing the diff fresh.
 
-## PR: {title}
-{pr_body}
+### Pass 1: Security & Correctness
+Review using the Pass 1 checklist. Focus on what could break or be exploited.
 
-## Repository Coding Standards
-{agents_md_content OR "No AGENTS.md found for this repository."}
+### Pass 2: Architecture & Design
+Review using the Pass 2 checklist. Focus on structure, patterns, and maintainability.
 
-## Diff
-{diff}
+### Pass 3: Standards Compliance
+Review using the Pass 3 checklist. Compare against the Review Standards above.
 
-Review this PR focusing on:
-- Architecture and design patterns
-- Code organization and separation of concerns
-- Naming and readability
-- Compliance with repo coding standards (from AGENTS.md)
-- Unnecessary complexity or over-engineering
-- Missing tests or documentation where needed
+### Pass 4: Edge Cases & Robustness
+Review using the Pass 4 checklist. Think about what happens at boundaries.
 
-Produce your review in this exact format:
+## Output Format
 
-## Summary
-[1-2 sentence overall architecture/design assessment]
+For each pass, list findings in this format. If a pass has no findings, write "No issues found."
 
-## Verdict
-APPROVE | REQUEST_CHANGES | COMMENT
+### Pass 1: Security & Correctness
 
-## Inline Comments
-- **path/to/file.py:LINE_NUMBER** — [specific issue with this line]
+**[critical] path/to/file:LINE** — Description of the issue.
 
-## General Comments
-- [broader observations not tied to a specific line]
+**[warning] path/to/file:LINE** — Description of the issue.
 
-IMPORTANT: For inline comments, the LINE_NUMBER must be the line number within the diff (the new_position — i.e., the line number in the new version of the file as shown in the diff's @@ hunk headers). Only comment on lines that appear in the diff.
-```
+### Pass 2: Architecture & Design
 
-## Step 7: Synthesize and post review
+**[nit] path/to/file:LINE** — Description of the issue.
 
-Combine the outputs from both subagents into a single review.
+### Pass 3: Standards Compliance
 
-### Build the review body
+**[warning] path/to/file:LINE** — Description of the issue.
 
-Format the combined review as:
+### Pass 4: Edge Cases & Robustness
 
-```
-## Code Review — {PR title}
+**[warning] path/to/file:LINE** — Description of the issue.
 
-### Security & Correctness
-{paranoid subagent summary}
+### Summary
 
-### Architecture & Design
-{architect subagent summary}
+2-3 sentence overall assessment of the PR.
 
-### Verdict
-- Security: {paranoid verdict}
-- Architecture: {architect verdict}
-
-### Details
-
-{All general comments from both subagents, grouped by topic}
+IMPORTANT: LINE must be the line number in the NEW version of the file (from the diff's @@ hunk headers, the + side). Only comment on lines that appear in the diff.
 ```
 
-### Build the inline comments array
+## Step 6: Synthesize and post review
 
-Parse all `**path/to/file.py:LINE** — comment` entries from both subagents. For each:
-- Extract `path` (the file path)
-- Extract `new_position` (the line number)
-- Extract the comment body
-- Tag with `[Security]` or `[Architecture]` prefix based on which subagent produced it
+### Parse findings
 
-Build a JSON array of comment objects:
-```json
-[
-  {
-    "path": "path/to/file.py",
-    "body": "[Security] comment text here",
-    "new_position": 42
-  }
-]
+From the subagent output, extract all findings matching the pattern `**[severity] path:LINE** — description`. Count findings by severity.
+
+### Compute verdict
+
+- Any `[critical]` finding → verdict is `REQUEST_CHANGES`
+- `[warning]` but no `[critical]` → verdict is `COMMENT`
+- Only `[nit]` or no findings → verdict is `APPROVE`
+
+### Build review body
+
+Format the review as:
+
+```
+## Code Review
+
+### Verdict: {VERDICT}
+{count} critical, {count} warnings, {count} nits
+
+### Findings
+
+{All findings from all four passes, in order, preserving severity tags}
+
+### Summary
+{Summary from subagent}
 ```
 
-### Post the review via curl
+### Build inline comments
 
-Use the Bash tool to post the review using the code-review-agent token. Read the Gitea API URL from the infrastructure config:
+Parse all findings that have a valid `path:LINE`. For each, build a comment object:
+- `path` — the file path
+- `body` — the full finding text including severity tag (e.g., `[warning] Missing resource limits on container.`)
+- `new_line_num` — the line number (integer)
 
-!`cat $HOME/gitea-repos/development-skills/config/infrastructure.md`
+### Post via MCP
+
+Use `mcp__gitea-reviewer__create_pull_request_review` with:
+- `owner`, `repo`, `index`
+- `state`: always `"COMMENT"` — the agent recommends but never gates merges
+- `body`: the formatted review body
+- `comments`: the inline comments array
+
+**Important:** Always post with `state: "COMMENT"` regardless of the computed verdict. The verdict is informational (shown in the review body), not a merge gate.
+
+If the MCP tool is not available (new session without restart), fall back to curl:
 
 ```bash
 curl -s -X POST \
-  -H "Authorization: token {TOKEN}" \
+  -H "Authorization: token $(cat $HOME/.config/code-review-agent/token)" \
   -H "Content-Type: application/json" \
-  "{GITEA_API_URL}/repos/{owner}/{repo}/pulls/{index}/reviews" \
-  -d '{
-    "body": "REVIEW_BODY_HERE",
-    "event": "COMMENT",
-    "comments": [INLINE_COMMENTS_ARRAY]
-  }'
+  "https://git.home.superwerewolves.ninja/api/v1/repos/{owner}/{repo}/pulls/{index}/reviews" \
+  -d @/tmp/review-payload.json
 ```
 
-**Important:**
-- Always use `"event": "COMMENT"` — never APPROVE or REQUEST_CHANGES (the agent recommends but doesn't gate merges)
-- If there are no inline comments, omit the `comments` field or pass an empty array
-- Properly escape the JSON body (use a heredoc or write to a temp file if needed)
-- Use the Gitea API URL from `config/infrastructure.md` (the `Gitea API URL` row)
-- **CRITICAL: Inline comment field names differ between the MCP tool and the REST API.** The Gitea REST API expects `new_position` and `old_position`. Do NOT use `new_line_num` / `old_line_num` (those are MCP tool parameter names only). Using the wrong field name causes all comments to silently collapse to position 0.
+Where `/tmp/review-payload.json` contains `{"body": "...", "event": "COMMENT", "comments": [...]}` with `new_position` (NOT `new_line_num`) for the REST API.
 
-### Report results
+**CRITICAL:** The Gitea REST API uses `new_position` for inline comment line numbers. The MCP tool uses `new_line_num`. These are different field names for the same concept — using the wrong one causes comments to silently collapse to position 0.
 
-After posting, tell the user:
+## Step 7: Report results
+
+Tell the user:
 1. The review was posted successfully (or report any errors)
-2. A brief summary of findings
-3. How many inline comments were posted
-4. The verdicts from each subagent
+2. The computed verdict and severity counts
+3. A brief summary of key findings
+4. How many inline comments were posted
