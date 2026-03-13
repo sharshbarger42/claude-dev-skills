@@ -6,28 +6,4 @@ on:
 
 jobs:
   check-commits:
-    runs-on: [ubuntu-latest]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Check for Claude references in commit messages
-        run: |
-          base="${{ github.event.pull_request.base.sha }}"
-          head="${{ github.event.pull_request.head.sha }}"
-
-          violations=$(git log "$base".."$head" --format="%H %s%n%b" | grep -i -E "co-authored-by.*claude|generated.*claude.code" || true)
-
-          if [ -n "$violations" ]; then
-            echo "::error::Found Claude references in commit messages. Please amend the commits to remove them."
-            echo ""
-            echo "Violations:"
-            echo "$violations"
-            echo ""
-            echo "To fix: git rebase -i $base, then edit the offending commits"
-            exit 1
-          fi
-
-          echo "All commit messages are clean."
+    uses: super-werewolves/gitea-deploy-actions/.gitea/workflows/check-commits-reusable.yml@main
