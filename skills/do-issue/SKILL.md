@@ -72,13 +72,22 @@ Use `AskUserQuestion` to get the user's confirmation or refinement before writin
 
 Use worktree isolation so the main working tree stays clean:
 
-1. Verify the local repo path from the shorthand table exists — if not, tell the user to clone the repo first and stop
-2. Use the `EnterWorktree` tool with `name: {index}-{short-slug}` to create an isolated worktree
+1. `cd` to the local repo path from the shorthand table. Verify the directory exists — if not, tell the user to clone the repo first and stop.
+2. Check if the session is **already inside a worktree** (`git rev-parse --git-common-dir` differs from `git rev-parse --git-dir`). If so, you're already isolated — skip straight to creating the feature branch (step 5).
+3. Use the `EnterWorktree` tool with `name: issue-{index}` to create an isolated worktree.
+   - EnterWorktree handles creating the worktree, switching the session's working directory, and cleanup on exit.
+   - If `EnterWorktree` fails (e.g., already in a worktree), fall back to **in-place mode** below.
+4. Verify you're in the worktree with `git branch --show-current` and `pwd`
+5. Create the feature branch: `git checkout -b feature/{index}-{short-slug}`
    - `short-slug`: lowercase, hyphenated, 3-5 words from the issue title (e.g., `add-tandoor-recipe-integration`)
-   - This creates a new branch and switches the session's working directory to the worktree
-3. Verify you're in the worktree with `git branch --show-current` and `pwd`
-4. Rename the branch to follow convention: `git branch -m feature/{index}-{short-slug}`
-5. **Update status label:** Add `status: in-progress` to the issue and remove `status: backlog` if present.
+6. **Update status label:** Add `status: in-progress` to the issue and remove `status: backlog` if present.
+
+**In-place fallback** (only if EnterWorktree fails):
+
+1. `git fetch origin`
+2. Check for dirty working tree (`git status --porcelain`). If dirty, warn the user and ask how to proceed.
+3. `git checkout {default_branch} && git pull origin {default_branch}`
+4. Create the feature branch: `git checkout -b feature/{index}-{short-slug}`
 
 !`cat $HOME/gitea-repos/development-skills/lib/status-labels.md`
 
