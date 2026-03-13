@@ -202,15 +202,14 @@ If the local path doesn't exist or isn't a git repo, skip this step silently.
 
 ## Step 7: Check for deploy workflows
 
-Use this mapping to determine if a merged repo has a deploy-on-merge workflow:
+Dynamically discover whether each merged repo has a deploy workflow — do NOT rely on a hardcoded list.
 
-| Repo | Deploy workflow | Health check |
-|------|----------------|--------------|
-| `food-automation` | `deploy.yaml` | `curl -s http://food.baryonyx-walleye.ts.net/health` |
-| `homelab-setup` | `deploy.yml` | `scripts/check-managed.sh` (exit code) |
-| `multi-agent-coordinator` | `deploy.yml` | None (placeholder — pending K3s cluster setup) |
+For each merged repo:
 
-If the merged repo is NOT in this table, skip to Step 10 for that PR.
+1. Call `mcp__gitea__actions_run_read(method="list_workflows", owner="{owner}", repo="{repo}")` to get the list of workflow files in the repo
+2. Look for any workflow with a filename matching `deploy*` (e.g., `deploy.yml`, `deploy.yaml`, `deploy-prod.yml`)
+3. If a matching deploy workflow is found, record its filename and proceed to Step 8 for that PR
+4. If no deploy workflow is found, skip to Step 10 for that PR
 
 ## Step 8: Wait for deployment
 
@@ -230,10 +229,27 @@ If no deploy run is found after 5 minutes, note this as "deploy not triggered" a
 
 ### If deploy succeeded
 
-Run the repo-specific health check from the table in Step 7:
+Dynamically discover whether the repo defines a post-merge health check — do NOT rely on a hardcoded list.
 
-- **food-automation**: `curl -s http://food.baryonyx-walleye.ts.net/health` via Bash — verify the response contains `"status"` with value `"ok"` and services show `"ready"`
-- **homelab-setup**: Run `scripts/check-managed.sh` from the local repo checkout via Bash. The script checks K3s nodes, Flux CD kustomizations, and all apps listed in `k8s/apps/kustomization.yaml`. Parse the last line of stdout as JSON: `{"healthy": bool, "nodes": int, "apps": [...], "failed": [...]}`. Healthy = exit code 0.
+#### Discovering health checks from AGENTS.md
+
+For each merged repo:
+
+1. Fetch the repo's `AGENTS.md` from the default branch using `mcp__gitea__get_file_contents(owner, repo, ref=default_branch, filePath="AGENTS.md")`
+2. Look for a `## Post-Merge Checklist` section in the file content
+3. If the section exists, parse it for:
+   - **Health check command** — a fenced code block after "Health check command:" (e.g. `scripts/check-managed.sh` or `curl -s http://example.com/health`)
+   - **How to evaluate** — instructions below the command explaining how to interpret the output (exit codes, JSON parsing, expected response fields)
+4. If the section does **not** exist, or `AGENTS.md` is missing, skip the health check — report deploy status only
+
+#### Running the health check
+
+If a health check command was found:
+- If the command starts with `curl`, run it directly via Bash
+- If the command is a script path (e.g. `scripts/check-managed.sh`), run it from the repo's local checkout (use the `Local path` from the shorthand table in `config/repos.md`)
+- Follow the "How to evaluate" instructions from the same section to determine pass/fail
+
+For repos **without a Post-Merge Checklist**: report deploy as "Passed" or "Failed" with no Health column value (use `—`).
 
 If the health check **fails** (non-200 response, status not ok, services not ready, or script exits non-zero), create a Gitea issue:
 ```
