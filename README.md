@@ -4,6 +4,20 @@ Portable Claude Code skills plugin for dev workflow automation.
 
 ## Install
 
+### Plugin system (recommended)
+
+```bash
+# Add the marketplace
+/plugin marketplace add https://gitea.int.superwerewolves.ninja/super-werewolves/development-skills.git
+
+# Install the plugin
+/plugin install development-skills@super-werewolves-skills
+```
+
+Skills are invoked as `/development-skills:do-issue`, `/development-skills:review-pr`, etc.
+
+### Symlink fallback
+
 ```bash
 git clone ssh://gitea@192.168.0.174:2222/super-werewolves/development-skills.git ~/gitea-repos/development-skills
 cd ~/gitea-repos/development-skills
@@ -24,7 +38,10 @@ This symlinks each skill directory into `~/.claude/skills/`. A `git pull` instan
 
 ```
 development-skills/
-├── install.sh              # Symlink installer + prerequisite checker
+├── .claude-plugin/
+│   └── plugin.json         # Plugin metadata (name, version, description)
+├── marketplace.json        # Marketplace catalog for plugin discovery
+├── install.sh              # Symlink installer + prerequisite checker (fallback)
 ├── config/
 │   ├── repos.md            # Centralized repo shorthand table
 │   └── infrastructure.md   # IPs, domains, service URLs

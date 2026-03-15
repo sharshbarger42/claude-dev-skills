@@ -1,0 +1,5 @@
+{
+  "name": "development-skills",
+  "version": "1.0.0",
+  "description": "Dev workflow automation — issue implementation, PR review, merge, triage, and full dev loops for Gitea-hosted repos."
+}
