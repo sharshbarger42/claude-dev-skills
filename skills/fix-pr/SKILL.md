@@ -103,6 +103,10 @@ Scan the comment `body` for severity tags:
 - `[nit]` → skip unless the fix is trivially mechanical (e.g., rename, whitespace)
 - No tag found → default to `warning` (backwards compatibility with older reviews)
 
+### Documentation comments (always fix)
+
+Any comment requesting documentation updates — README changes, doc corrections, adding/updating comments, fixing docstrings, updating AGENTS.md, or similar — is **always addressed directly** in this PR regardless of severity. Documentation fixes are low-risk and fast to implement, so they should never be deferred to a separate issue. This applies to both user comments and review-agent comments at any severity level.
+
 **Threading:** Group comments that share the same `path` + `position`. When a user replies to a review-agent comment on the same path/position, the user's reply modifies or overrides the agent's suggestion — use the user's intent.
 
 For each actionable comment, extract:
@@ -146,10 +150,11 @@ No new branch creation — we push directly to the existing PR branch.
 Read the relevant files and address comments in priority order:
 
 1. **User comments** (always required) — implement exactly what the user asked for
-2. **Bot `[critical]`** (required) — treat same as user comments, must be fixed
-3. **Bot `[warning]`** (fix or defer) — fix if the change is straightforward. If complex (requires architectural changes, new dependencies, or significant refactoring), create a Gitea issue instead using `mcp__gitea__create_issue` with title `"[review] {brief description}"` and body referencing the PR
-4. **Bot `[nit]`** (skip unless trivial) — only fix if the change is purely mechanical (rename, whitespace, typo). Skip all others
-5. **Issue creation** — for comments that explicitly say "create a ticket for X" or similar, use `mcp__gitea__create_issue`
+2. **Documentation comments** (always fix) — any comment requesting doc updates (README, AGENTS.md, code comments, docstrings, etc.) is always addressed directly regardless of severity. Never create a separate issue for documentation.
+3. **Bot `[critical]`** (required) — treat same as user comments, must be fixed
+4. **Bot `[warning]`** (fix or defer) — fix if the change is straightforward. If complex (requires architectural changes, new dependencies, or significant refactoring), create a Gitea issue instead using `mcp__gitea__create_issue` with title `"[review] {brief description}"` and body referencing the PR
+5. **Bot `[nit]`** (skip unless trivial) — only fix if the change is purely mechanical (rename, whitespace, typo). Skip all others
+6. **Issue creation** — for comments that explicitly say "create a ticket for X" or similar, use `mcp__gitea__create_issue`
 
 Follow the repo's AGENTS.md coding standards when making changes.
 
