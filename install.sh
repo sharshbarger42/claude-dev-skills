@@ -4,19 +4,52 @@ REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILLS_DIR="$HOME/.claude/skills"
 mkdir -p "$SKILLS_DIR"
 
-echo "=== Installing skills ==="
-for skill_dir in "$REPO_DIR/skills"/*/; do
-  name=$(basename "$skill_dir")
-  target="$SKILLS_DIR/$name"
-  if [[ -L "$target" ]]; then
-    echo "  $name: already linked"
-  elif [[ -d "$target" ]]; then
-    echo "  $name: EXISTS (not symlink) — skipping"
-  else
-    ln -sf "$skill_dir" "$target"
-    echo "  $name: linked"
+# Determine which groups to install
+GROUP="${1:-all}"
+case "$GROUP" in
+  all|workflow|planning) ;;
+  *)
+    echo "Usage: $0 [all|workflow|planning]"
+    echo "  all       Install all skills (default)"
+    echo "  workflow  Install workflow skills only (do-issue, review-pr, etc.)"
+    echo "  planning  Install planning skills only (analyze-idea, plan-project, etc.)"
+    exit 1
+    ;;
+esac
+
+install_group() {
+  local dir="$1" label="$2"
+  if [[ ! -d "$dir" ]]; then
+    echo "  ($label: directory not found — skipping)"
+    return
   fi
-done
+  local count=0
+  for skill_dir in "$dir"/*/; do
+    [[ -d "$skill_dir" ]] || continue
+    name=$(basename "$skill_dir")
+    target="$SKILLS_DIR/$name"
+    if [[ -L "$target" ]]; then
+      echo "  $name: already linked"
+    elif [[ -d "$target" ]]; then
+      echo "  $name: EXISTS (not symlink) — skipping"
+    else
+      ln -sf "$skill_dir" "$target"
+      echo "  $name: linked"
+    fi
+    count=$((count + 1))
+  done
+  echo "  ($label: $count skills)"
+}
+
+echo "=== Installing skills (group: $GROUP) ==="
+
+if [[ "$GROUP" == "all" || "$GROUP" == "workflow" ]]; then
+  install_group "$REPO_DIR/skills" "workflow"
+fi
+
+if [[ "$GROUP" == "all" || "$GROUP" == "planning" ]]; then
+  install_group "$REPO_DIR/planning-skills" "planning"
+fi
 
 echo ""
 echo "=== Prerequisites ==="
