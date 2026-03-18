@@ -3,8 +3,8 @@
 Register, query, and deregister active work across agents. Uses Gitea labels as the authoritative signal, Agent Mail for richer context, and Discord for user-facing notifications.
 
 **Prerequisites:** Include these libs first:
-- `!cat $HOME/gitea-repos/development-skills/lib/agent-identity.md`
-- `!cat $HOME/gitea-repos/development-skills/lib/discord-notify.md`
+- `!cat $HOME/.claude/development-skills/lib/agent-identity.md`
+- `!cat $HOME/.claude/development-skills/lib/discord-notify.md`
 
 ## Register Active Work
 

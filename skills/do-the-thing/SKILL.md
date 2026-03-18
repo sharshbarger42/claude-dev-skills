@@ -21,7 +21,7 @@ Extract `owner` and `repo` from the argument.
 
 #### Repo resolution
 
-!`cat $HOME/gitea-repos/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
 
 ### If no argument was provided
 
@@ -36,13 +36,13 @@ Infer the repo from the current working directory:
 
 ## Step 1b: Establish identity and discover active work
 
-!`cat $HOME/gitea-repos/development-skills/lib/agent-identity.md`
+!`cat $HOME/.claude/development-skills/lib/agent-identity.md`
 
 Derive your `AGENT_NAME` for this session.
 
-!`cat $HOME/gitea-repos/development-skills/lib/agent-coordination.md`
+!`cat $HOME/.claude/development-skills/lib/agent-coordination.md`
 
-!`cat $HOME/gitea-repos/development-skills/lib/discord-notify.md`
+!`cat $HOME/.claude/development-skills/lib/discord-notify.md`
 
 Use the **Query Active Work** procedure from `agent-coordination.md` to discover what other agents are currently working on in this repo. Store the list of active items (issue index, agent name, started timestamp, staleness flag) for use in Step 3.
 

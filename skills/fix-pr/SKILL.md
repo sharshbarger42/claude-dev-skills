@@ -18,19 +18,19 @@ Extract `owner`, `repo`, and PR `index` from the argument.
 
 ### Repo resolution
 
-!`cat $HOME/gitea-repos/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
 
 ## Step 1b: Establish identity and register active work
 
-!`cat $HOME/gitea-repos/development-skills/lib/agent-identity.md`
+!`cat $HOME/.claude/development-skills/lib/agent-identity.md`
 
 Derive your `AGENT_NAME` for this session.
 
-!`cat $HOME/gitea-repos/development-skills/lib/agent-coordination.md`
+!`cat $HOME/.claude/development-skills/lib/agent-coordination.md`
 
 Register active work on this PR using the **Register Active Work** procedure from `agent-coordination.md`. Use the PR index as the issue index and the PR title as the issue title.
 
-!`cat $HOME/gitea-repos/development-skills/lib/discord-notify.md`
+!`cat $HOME/.claude/development-skills/lib/discord-notify.md`
 
 Post a "Started Work" Discord notification for this PR.
 

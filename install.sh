@@ -2,7 +2,8 @@
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILLS_DIR="$HOME/.claude/skills"
-mkdir -p "$SKILLS_DIR"
+PLUGIN_DIR="$HOME/.claude/development-skills"
+mkdir -p "$SKILLS_DIR" "$PLUGIN_DIR"
 
 # Determine which groups to install
 GROUP="${1:-all}"
@@ -16,6 +17,17 @@ case "$GROUP" in
     exit 1
     ;;
 esac
+
+echo "=== Installing shared lib + config ==="
+for shared in lib config; do
+  target="$PLUGIN_DIR/$shared"
+  if [[ -L "$target" ]]; then
+    echo "  $shared: already linked"
+  else
+    ln -sf "$REPO_DIR/$shared" "$target"
+    echo "  $shared: linked"
+  fi
+done
 
 install_group() {
   local dir="$1" label="$2"
@@ -41,6 +53,7 @@ install_group() {
   echo "  ($label: $count skills)"
 }
 
+echo ""
 echo "=== Installing skills (group: $GROUP) ==="
 
 if [[ "$GROUP" == "all" || "$GROUP" == "workflow" ]]; then
