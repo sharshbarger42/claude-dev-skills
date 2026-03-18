@@ -4,7 +4,7 @@ Use this shared logic to parse issue/PR/repo references in dev-workflow skills.
 
 ## Load the shorthand table
 
-!`cat $HOME/gitea-repos/development-skills/config/repos.md`
+!`cat $HOME/.claude/development-skills/config/repos.md`
 
 ## Parsing rules
 

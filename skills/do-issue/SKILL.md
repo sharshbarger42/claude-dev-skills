@@ -18,11 +18,11 @@ Extract `owner`, `repo`, and issue `index` from the argument.
 
 ### Repo resolution
 
-!`cat $HOME/gitea-repos/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
 
 ## Step 1b: Establish identity and check for conflicts
 
-!`cat $HOME/gitea-repos/development-skills/lib/agent-identity.md`
+!`cat $HOME/.claude/development-skills/lib/agent-identity.md`
 
 Derive your `AGENT_NAME` for this session.
 
@@ -31,7 +31,7 @@ Then check if another agent is already working on this issue:
 1. Fetch the issue's current labels. If `status: in-progress` is present, another agent may already be on it.
 2. If Agent Mail is available, query for active work on this issue:
 
-!`cat $HOME/gitea-repos/development-skills/lib/agent-coordination.md`
+!`cat $HOME/.claude/development-skills/lib/agent-coordination.md`
 
 Use the **Query Active Work** procedure from `agent-coordination.md`, filtered to this specific issue.
 
@@ -89,7 +89,7 @@ Use worktree isolation so the main working tree stays clean:
 3. `git checkout {default_branch} && git pull origin {default_branch}`
 4. Create the feature branch: `git checkout -b feature/{index}-{short-slug}`
 
-!`cat $HOME/gitea-repos/development-skills/lib/status-labels.md`
+!`cat $HOME/.claude/development-skills/lib/status-labels.md`
 
 9. **Register active work:** After setting `status: in-progress`, register via Agent Mail and post a "Started Work" Discord notification using the procedures from `agent-coordination.md` and `discord-notify.md` (loaded in Step 1b). This is best-effort — if either fails, continue.
 

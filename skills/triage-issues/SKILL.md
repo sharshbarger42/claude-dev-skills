@@ -19,7 +19,7 @@ Extract `owner` and `repo` from the argument.
 
 ### Repo resolution
 
-!`cat $HOME/gitea-repos/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
 
 ## Step 2: Fetch all open issues
 
@@ -130,7 +130,7 @@ Show up to 5 recommended issues. Use ★ to indicate relative priority (★★�
 
 Show issues that are currently being worked on (have `status: in-progress` or `status: in-review` labels). If Agent Mail is available, query for richer context:
 
-!`cat $HOME/gitea-repos/development-skills/lib/agent-coordination.md`
+!`cat $HOME/.claude/development-skills/lib/agent-coordination.md`
 
 Use the **Query Active Work** procedure to get agent names and timestamps.
 

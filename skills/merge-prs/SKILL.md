@@ -19,7 +19,7 @@ If an argument was provided, extract `owner` and `repo`.
 
 ### Repo resolution
 
-!`cat $HOME/gitea-repos/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
 
 If **no argument** was provided, use `AskUserQuestion` with these options:
 - **All repos** — scan every repo in the shorthand table above
@@ -178,7 +178,7 @@ Record the merge timestamp for each successfully merged PR.
 
 **Discord notification:** After each successful merge, post a "PR Merged" Discord notification using the green embed template:
 
-!`cat $HOME/gitea-repos/development-skills/lib/discord-notify.md`
+!`cat $HOME/.claude/development-skills/lib/discord-notify.md`
 
 Read the webhook URL from `~/.config/development-skills/discord-webhook`. If the file doesn't exist, skip silently. Include the PR title, repo, PR number, and merge style in the notification. Use your agent name (derive it once at the start of the skill using the agent identity logic from `agent-identity.md`).
 
