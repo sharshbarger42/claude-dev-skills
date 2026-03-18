@@ -12,11 +12,11 @@ Transform a project plan into a structured set of Gitea milestones, feature issu
 1. Path to the plan directory (containing `plan.md` from `/plan-project`) — **required**
 2. Target `owner/repo` or shorthand — **optional** (will ask if not provided)
 
-!`cat $HOME/gitea-repos/development-skills/lib/planning-common.md`
+!`cat $HOME/.claude/development-skills/lib/planning-common.md`
 
 ### Repo resolution
 
-!`cat $HOME/gitea-repos/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
 
 ## Step 1: Read the plan
 

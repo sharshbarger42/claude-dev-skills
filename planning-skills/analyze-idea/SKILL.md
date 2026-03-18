@@ -10,7 +10,7 @@ Perform a rigorous critical analysis of a problem/solution idea. Challenge assum
 
 **Input:** Optional idea description as the skill argument. If not provided, the skill will gather it interactively.
 
-!`cat $HOME/gitea-repos/development-skills/lib/planning-common.md`
+!`cat $HOME/.claude/development-skills/lib/planning-common.md`
 
 ## Step 1: Gather information
 

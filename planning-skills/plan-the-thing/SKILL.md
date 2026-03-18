@@ -10,7 +10,7 @@ Full planning pipeline in one command: critically analyze an idea, create a deta
 
 **Input:** Optional idea description as the skill argument. If not provided, the first skill in the chain will gather it interactively.
 
-!`cat $HOME/gitea-repos/development-skills/lib/planning-common.md`
+!`cat $HOME/.claude/development-skills/lib/planning-common.md`
 
 ## Step 1: Analyze the idea
 
