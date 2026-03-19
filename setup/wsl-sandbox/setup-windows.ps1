@@ -42,67 +42,6 @@ if (-not $DryRun -and -not $Defaults) {
 
 $ErrorActionPreference = "Stop"
 
-# --- Helper: Build sudoers content from option selection ---
-function Build-SudoersContent {
-    param([string]$SudoChoice)
-    $sudoOptions = $SudoChoice -split "," | ForEach-Object { $_.Trim() }
-    $lines = @("# Controlled sudo for claude-user (sandbox mode)")
-    if ($sudoOptions -contains "5" -or $sudoOptions -contains "1") {
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt-get install *"
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt install *"
-    }
-    if ($sudoOptions -contains "5" -or $sudoOptions -contains "2") {
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt-get update"
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt update"
-    }
-    if ($sudoOptions -contains "5" -or $sudoOptions -contains "3") {
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/systemctl *"
-    }
-    if ($sudoOptions -contains "5" -or $sudoOptions -contains "4") {
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/tee /etc/apt/sources.list.d/*"
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/tee /etc/apt/trusted.gpg.d/*"
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/add-apt-repository *"
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt-key *"
-    }
-    $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/chsh *"
-    return $lines -join "`n"
-}
-
-# --- Helper: Prompt for sudo choice ---
-function Get-SudoChoice {
-    param([switch]$UseDefaults)
-    if ($UseDefaults) {
-        Write-Host "  [defaults] Sudo: 1,2,4" -ForegroundColor Yellow
-        return "1,2,4"
-    }
-    Write-Host "  Select which sudo commands to allow (comma-separated):" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "    1. apt-get install (install packages)"
-    Write-Host "    2. apt-get update (update package lists)"
-    Write-Host "    3. systemctl (manage services)"
-    Write-Host "    4. tee /etc/apt/* (write apt config files)"
-    Write-Host "    5. All of the above"
-    Write-Host ""
-    $choice = Read-Host "    Selection (default: 1,2,4)"
-    if ([string]::IsNullOrWhiteSpace($choice)) { $choice = "1,2,4" }
-    return $choice
-}
-
-# --- Helper: Apply sudoers to distro ---
-function Apply-Sudoers {
-    param([string]$Content)
-    $script = @"
-#!/bin/bash
-set -e
-cat > /etc/sudoers.d/claude-user << 'SUDOERS'
-$Content
-SUDOERS
-chmod 440 /etc/sudoers.d/claude-user
-"@
-    $script | Invoke-Wsl -d Ubuntu-Claude -u root -- bash -c "tr -d '\r' > /tmp/reconfig-sudo.sh"
-    Invoke-Wsl -d Ubuntu-Claude -u root -- bash /tmp/reconfig-sudo.sh
-}
-
 if ($DryRun) {
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host " DRY RUN MODE - No changes will be made" -ForegroundColor Cyan
@@ -361,9 +300,54 @@ echo "shared_dir=$(grep -q 'drvfs' /etc/fstab 2>/dev/null && echo Y || echo N)"
     # --- Reconfigure sudo if selected ---
     if ($doSudoReconfig -and -not $DryRun) {
         Write-Host "`nReconfiguring sudo permissions..." -ForegroundColor Cyan
-        $sudoChoice = Get-SudoChoice -UseDefaults:$Defaults
-        $sudoersContent = Build-SudoersContent $sudoChoice
-        Apply-Sudoers $sudoersContent
+
+        if ($Defaults) {
+            Write-Host "  [defaults] Sudo: 1,2,4" -ForegroundColor Yellow
+            $sudoChoice = "1,2,4"
+        } else {
+            Write-Host "  Select which sudo commands to allow (comma-separated):" -ForegroundColor Yellow
+            Write-Host ""
+            Write-Host "    1. apt-get install (install packages)"
+            Write-Host "    2. apt-get update (update package lists)"
+            Write-Host "    3. systemctl (manage services)"
+            Write-Host "    4. tee /etc/* (write system config files)"
+            Write-Host "    5. All of the above"
+            Write-Host ""
+            $sudoChoice = Read-Host "    Selection (default: 1,2,4)"
+            if ([string]::IsNullOrWhiteSpace($sudoChoice)) { $sudoChoice = "1,2,4" }
+        }
+
+        $sudoOptions = $sudoChoice -split "," | ForEach-Object { $_.Trim() }
+        $sudoersLines = @("# Controlled sudo for claude-user (sandbox mode)")
+        if ($sudoOptions -contains "5" -or $sudoOptions -contains "1") {
+            $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt-get install *"
+            $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt install *"
+        }
+        if ($sudoOptions -contains "5" -or $sudoOptions -contains "2") {
+            $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt-get update"
+            $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt update"
+        }
+        if ($sudoOptions -contains "5" -or $sudoOptions -contains "3") {
+            $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/systemctl *"
+        }
+        if ($sudoOptions -contains "5" -or $sudoOptions -contains "4") {
+            $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/tee /etc/*"
+            $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/add-apt-repository *"
+            $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt-key *"
+        }
+        $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/chsh *"
+        $sudoersContent = $sudoersLines -join "`n"
+
+        $sudoScript = @"
+#!/bin/bash
+set -e
+cat > /etc/sudoers.d/claude-user << 'SUDOERS'
+$sudoersContent
+SUDOERS
+chmod 440 /etc/sudoers.d/claude-user
+"@
+        $sudoScript | Invoke-Wsl -d Ubuntu-Claude -u root -- bash -c "tr -d '\r' > /tmp/reconfig-sudo.sh"
+        Invoke-Wsl -d Ubuntu-Claude -u root -- bash /tmp/reconfig-sudo.sh
         Write-Host "  Sudo permissions updated." -ForegroundColor Green
     } elseif ($doSudoReconfig -and $DryRun) {
         Write-Host "[Would reconfigure] sudo permissions" -ForegroundColor Yellow
@@ -403,18 +387,44 @@ Then re-run this script.
     # --- Configure Ubuntu-Claude ---
     Write-Host "Configuring Ubuntu-Claude..." -ForegroundColor Cyan
 
-    Write-Host ""
-    Write-Host "Sudo permissions for claude-user:" -ForegroundColor Yellow
-    $sudoChoice = Get-SudoChoice -UseDefaults:$Defaults
-    $sudoersContent = Build-SudoersContent $sudoChoice
-
-    # Build shared directory mount line (expand PowerShell vars now, not inside bash)
-    $fstabLine = ""
-    $mountDir = ""
-    if (-not [string]::IsNullOrWhiteSpace($SharedWinPath) -and -not [string]::IsNullOrWhiteSpace($SharedMountPoint)) {
-        $fstabLine = "$SharedWinPath $SharedMountPoint drvfs defaults 0 0"
-        $mountDir = $SharedMountPoint
+    if ($Defaults) {
+        Write-Host "  [defaults] Sudo permissions: 1,2,4" -ForegroundColor Yellow
+        $sudoChoice = "1,2,4"
+    } else {
+        Write-Host ""
+        Write-Host "Sudo permissions for claude-user:" -ForegroundColor Yellow
+        Write-Host "  Select which sudo commands to allow (enter comma-separated numbers):"
+        Write-Host ""
+        Write-Host "  1. apt-get install (install packages)"
+        Write-Host "  2. apt-get update (update package lists)"
+        Write-Host "  3. systemctl (manage services)"
+        Write-Host "  4. tee /etc/* (write system config files - needed for adding apt repos)"
+        Write-Host "  5. All of the above"
+        Write-Host ""
+        $sudoChoice = Read-Host "Selection (default: 1,2,4)"
+        if ([string]::IsNullOrWhiteSpace($sudoChoice)) { $sudoChoice = "1,2,4" }
     }
+    $sudoOptions = $sudoChoice -split "," | ForEach-Object { $_.Trim() }
+
+    $sudoersLines = @("# Controlled sudo for claude-user (sandbox mode)")
+    if ($sudoOptions -contains "5" -or $sudoOptions -contains "1") {
+        $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt-get install *"
+        $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt install *"
+    }
+    if ($sudoOptions -contains "5" -or $sudoOptions -contains "2") {
+        $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt-get update"
+        $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt update"
+    }
+    if ($sudoOptions -contains "5" -or $sudoOptions -contains "3") {
+        $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/systemctl *"
+    }
+    if ($sudoOptions -contains "5" -or $sudoOptions -contains "4") {
+        $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/tee /etc/*"
+        $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/add-apt-repository *"
+        $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt-key *"
+    }
+    $sudoersLines += "claude-user ALL=(root) NOPASSWD: /usr/bin/chsh *"
+    $sudoersContent = $sudoersLines -join "`n"
 
     $setupScript = @"
 #!/bin/bash
@@ -446,9 +456,9 @@ SUDOERS
 chmod 440 /etc/sudoers.d/claude-user
 
 # Add shared directory mount if configured
-if [[ -n "$fstabLine" ]]; then
-    mkdir -p "$mountDir"
-    echo "$fstabLine" >> /etc/fstab
+if [[ -n '$SharedWinPath' && -n '$SharedMountPoint' ]]; then
+    mkdir -p '$SharedMountPoint'
+    echo '$SharedWinPath $SharedMountPoint drvfs defaults 0 0' >> /etc/fstab
 fi
 
 # Lock the Windows user account inside this distro
@@ -522,12 +532,11 @@ if (-not $DryRun -and $ubuntuClaudeExists -and -not [string]::IsNullOrWhiteSpace
     }
 
     if ($applyMount) {
-        $fstabEntry = "$SharedWinPath $SharedMountPoint drvfs defaults 0 0"
         $mountScript = @"
 #!/bin/bash
 sed -i '/drvfs/d' /etc/fstab 2>/dev/null || true
-echo "$fstabEntry" >> /etc/fstab
-mkdir -p "$SharedMountPoint"
+echo '$SharedWinPath $SharedMountPoint drvfs defaults 0 0' >> /etc/fstab
+mkdir -p '$SharedMountPoint'
 if grep -q '^\[automount\]' /etc/wsl.conf; then
     if ! grep -q 'mountFsTab' /etc/wsl.conf; then
         sed -i '/^\[automount\]/a mountFsTab=true' /etc/wsl.conf
