@@ -2,7 +2,7 @@
 name: test
 description: Plan, document, and execute end-to-end tests for a Gitea issue. Reads the issue and codebase, builds a test plan, handles test data setup, and runs tests. Use when the user says "test this issue", "write e2e tests for", "run tests for [issue]", or "verify [issue] works".
 argument-hint: [repo#issue]
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, AskUserQuestion, mcp__gitea__get_issue_by_index, mcp__gitea__get_issue_comments_by_index, mcp__gitea__get_file_content
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, AskUserQuestion, mcp__gitea__get_issue, mcp__gitea__get_issue_comments, mcp__gitea__get_repo_file_contents
 ---
 
 # End-to-End Test
@@ -13,11 +13,12 @@ Plan, document, and execute end-to-end tests for Gitea issue **$ARGUMENTS**.
 
 ## Phase 1: Understand the Issue
 
-1. **Resolve and fetch the issue.**
+1. **Resolve and fetch the issue.** Parse `$ARGUMENTS` using the same resolution logic as other skills:
+   - `repo#123` — resolve via shorthand table at `~/.claude/development-skills/config/repos.md`
+   - `owner/repo#123` — use directly
+   - `#123` — detect from current git remote
 
-   !`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
-
-   Parse `$ARGUMENTS` using the resolution logic above. Fetch with `mcp__gitea__get_issue_by_index`. Also fetch comments with `mcp__gitea__get_issue_comments_by_index`. Capture:
+   Fetch with `mcp__gitea__get_issue`. Also fetch comments with `mcp__gitea__get_issue_comments`. Capture:
    - Title, body, acceptance criteria
    - Labels (may indicate affected area)
    - Any linked PRs or related issues mentioned
