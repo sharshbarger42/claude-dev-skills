@@ -182,7 +182,7 @@ Responding to review comments:
 
 **After posting the triage comment:**
 - For "fix now" items: implement the fixes, commit, and push to the same branch
-- For "separate issue" items: create the Gitea issue immediately using `mcp__gitea__create_issue`, link back to this PR
+- For "separate issue" items: create the Gitea issue immediately using `mcp__gitea__create_issue`, link back to this PR. If the issue describes a bug (broken behavior, correctness problem), add the `bug` label: call `mcp__gitea__list_repo_labels` to find the label ID, then `mcp__gitea__add_issue_labels`. Skip silently if the label doesn't exist.
 - For "won't fix" items: no action needed
 
 ## Step 11: Update documentation
