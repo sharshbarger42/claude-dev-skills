@@ -73,9 +73,48 @@ For each PR marked `ready` from Step 3:
 1. Use the head commit SHA from the PR metadata
 2. Call `mcp__gitea__list_repo_action_runs` to find workflow runs — look for runs where the branch matches the PR's head branch
 3. Check that all completed runs have `status: "success"`
-4. If any run has `status: "failure"`, mark the PR as `not mergeable (CI failed: {run name})`
-5. If any run is still `running` or `pending`, mark the PR as `not mergeable (CI in progress)`
+4. If any run has `status: "failure"`, mark the PR as `ci_failed` with the failing run name and workflow path
+5. If any run is still `running` or `pending`, wait up to 5 minutes (poll every 30s), then re-check. If still not done, mark as `not mergeable (CI in progress)`
 6. If no runs exist for the branch, treat CI as passed (repo may not have CI configured)
+
+## Step 4b: Fix CI failures
+
+For each PR marked `ci_failed` from Step 4, attempt to fix the failure automatically. This handles cases where CI breaks due to linting, formatting, or validation issues — even if unrelated to the PR's changes (e.g., new lint rules introduced on main after the PR was created).
+
+### Diagnose the failure
+
+1. Fetch the failing run's job logs using `mcp__gitea__get_repo_action_job_log_preview` or `mcp__gitea__download_repo_action_job_log` to identify the error
+2. Classify the failure:
+   - **Linting/formatting** (ansible-lint, yamllint, eslint, prettier, etc.) — fixable
+   - **Validation** (kubeconform, terraform validate, syntax-check) — fixable
+   - **Tests** (unit tests, integration tests) — fixable if the error is clear
+   - **Infrastructure** (runner timeout, network error, OOM) — not fixable, skip
+
+### Fix and push
+
+If the failure is fixable:
+
+1. Resolve the repo's local path from the shorthand table
+2. Check out the PR branch:
+   ```bash
+   cd {local_path}
+   git fetch origin
+   git checkout {head_branch} && git pull origin {head_branch}
+   ```
+3. Run the failing tool locally to reproduce and identify specific errors (e.g., `ansible-lint`, `yamllint`, `kubeconform`)
+4. Fix each error — edit the files, staying within the scope of what's needed to pass CI
+5. Commit with message: `fix(#{pr_index}): resolve CI {tool} failures`
+   - **IMPORTANT:** Per AGENTS.md — NO Claude/AI/co-authored-by references in commit messages
+6. Push to the PR branch: `git push origin {head_branch}`
+7. Wait for CI to re-run (poll every 30s for up to 5 minutes)
+8. If CI passes, mark the PR as `ready`
+9. If CI still fails after the fix attempt, mark as `not mergeable (CI failed after fix attempt: {details})`
+
+### Limits
+
+- Attempt at most **one fix cycle** per PR — do not loop
+- Do not fix failures that require architectural changes or new dependencies
+- If the fix would change the PR's behavior or scope, skip it and leave the PR as `not mergeable`
 
 ## Step 5: Confirm with user
 
@@ -87,13 +126,14 @@ Present a summary table of ALL open PRs across all scanned repos:
 | Repo | PR | Title | Commits | Reviews | CI | Merge Style |
 |------|----|-------|---------|---------|----|----|
 | food-automation | #39 | refactor: enforce layer boundary | 1 | All addressed | Passed | rebase |
-| homelab-setup | #45 | feat(#40): add monitoring stack | 3 | All addressed | Passed | squash |
+| homelab-setup | #45 | feat(#40): add monitoring stack | 3 | All addressed | Fixed (ansible-lint) | squash |
 
 ## PRs Not Ready
 
 | Repo | PR | Title | Reason |
 |------|----|-------|--------|
 | homelab-setup | #12 | feat: add backup | 2 unaddressed comments |
+| homelab-setup | #18 | feat: new service | CI failed after fix attempt: test_integration |
 ```
 
 Use `AskUserQuestion` with `multiSelect: true` to let the user select which ready PRs to merge. List each ready PR as an option. If there are multiple ready PRs, include an "All ready PRs" convenience option.
@@ -290,12 +330,12 @@ For each PR that was in scope, report its final status:
 ```
 ## Merge Results
 
-| Repo | PR | Title | Merge | Deploy | Health | Issue |
-|------|----|-------|-------|--------|--------|-------|
-| food-automation | #39 | refactor: enforce layer boundary | Merged (rebase, 1 commit) | Passed | Healthy | — |
-| homelab-setup | #45 | feat(#40): add monitoring stack | Merged (squash, 3→1) | Failed | — | #46 created |
-| recipe-readiness | #8 | fix: parser edge case | Merged (rebase, 1 commit) | N/A | N/A | — |
-| food-automation | #40 | feat: new endpoint | Skipped | — | — | — (2 unaddressed comments) |
+| Repo | PR | Title | CI Fix | Merge | Deploy | Health | Issue |
+|------|----|-------|--------|-------|--------|--------|-------|
+| food-automation | #39 | refactor: enforce layer boundary | — | Merged (rebase, 1 commit) | Passed | Healthy | — |
+| homelab-setup | #45 | feat(#40): add monitoring stack | Fixed (ansible-lint) | Merged (squash, 4→1) | Failed | — | #46 created |
+| recipe-readiness | #8 | fix: parser edge case | — | Merged (rebase, 1 commit) | N/A | N/A | — |
+| food-automation | #40 | feat: new endpoint | — | Skipped | — | — | — (2 unaddressed comments) |
 ```
 
 Keep the output concise. No fluff.
