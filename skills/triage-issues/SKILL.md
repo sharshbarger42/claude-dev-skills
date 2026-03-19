@@ -48,11 +48,15 @@ An issue is **blocked** if any of these are true:
 - Its body contains an unchecked dependency like `- [ ] Depends on #N` or `Blocked by #N` where #N is still open
 - It has a label whose name contains `wontfix`, `duplicate`, or `invalid`
 
+An issue is **awaiting decision** if it has the `decision-needed` label. These are NOT blocked in the traditional sense — they need a human to make a call before an agent can implement. Track them separately for the "Awaiting Decision" section in Step 7.
+
 Separately, flag issues that appear to be **duplicates** of each other — these are handled interactively in Step 5b rather than silently blocked.
 
 Everything else is **actionable**.
 
 Additionally, **exclude** issues with `status: in-progress` or `status: in-review` labels entirely from the recommended list — these are already being worked on and should not be suggested. Track them separately for the "Currently Active" section in Step 7.
+
+Also **exclude** `decision-needed` issues from the recommended list and scoring — they cannot be auto-implemented until the decision is resolved. Track them for the "Awaiting Decision" section in Step 7.
 
 ## Step 5b: Detect duplicates
 
@@ -140,6 +144,18 @@ Use the **Query Active Work** procedure to get agent names and timestamps.
 | #{index} {title} | in-review | — | — | PR open |
 
 If no issues are currently active, omit this section.
+
+### Awaiting Decision
+
+Show issues that have the `decision-needed` label. For each, briefly summarize the pending question (from the issue comments or body):
+
+| Issue | Decision Needed |
+|-------|----------------|
+| #{index} {title} | {1-line summary of the open question} |
+
+If no decision-needed issues, omit this section.
+
+> To resolve a decision and start work: `/do-issue {repo}#{index}` — you'll be prompted with the open question first.
 
 ### Blocked
 
