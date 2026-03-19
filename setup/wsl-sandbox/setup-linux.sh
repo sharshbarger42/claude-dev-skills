@@ -298,40 +298,29 @@ export NVM_DIR="$HOME/.nvm"
 NVMRC
 fi
 
-# --- 9. Gitea SSH key ---
+# --- 9. Zsh plugins ---
 echo ""
-echo "--- Gitea SSH Key ---"
-GITEA_KEY="$HOME/.ssh/id_ed25519_gitea"
-if [[ -f "$GITEA_KEY" ]]; then
-    echo "  [skip] SSH key already exists"
-    echo "  Public key:"
-    echo "  $(cat "${GITEA_KEY}.pub")"
+echo "--- Zsh Plugins ---"
+ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+for plugin_repo in \
+    "zsh-users/zsh-autosuggestions" \
+    "zsh-users/zsh-syntax-highlighting"; do
+    plugin_name="${plugin_repo##*/}"
+    plugin_dir="$ZSH_CUSTOM/plugins/$plugin_name"
+    if [[ -d "$plugin_dir" ]]; then
+        echo "  [skip] $plugin_name already installed"
+    else
+        echo "  [install] $plugin_name..."
+        git clone "https://github.com/$plugin_repo.git" "$plugin_dir" --depth 1 > /dev/null 2>&1
+    fi
+done
+
+# fzf binary (the OMZ fzf plugin needs the binary)
+if command_exists fzf; then
+    echo "  [skip] fzf already installed"
 else
-    echo "  Generating SSH key for Gitea..."
-    mkdir -p "$HOME/.ssh"
-    ssh-keygen -t ed25519 -C "claude-sandbox@$(hostname)" -f "$GITEA_KEY" -N ""
-    echo ""
-    echo "  Add this public key to your Gitea account:"
-    echo "  $(cat "${GITEA_KEY}.pub")"
-    echo ""
-
-    # Configure SSH to use this key for Gitea
-    GITEA_HOST=$(config_get "gitea.url" | sed 's|https\?://||' | sed 's|/.*||')
-    if [[ -z "$GITEA_HOST" ]]; then
-        GITEA_HOST="git.home.superwerewolves.ninja"
-    fi
-
-    if ! grep -q "$GITEA_HOST" "$HOME/.ssh/config" 2>/dev/null; then
-        cat >> "$HOME/.ssh/config" << SSHCONF
-
-Host $GITEA_HOST
-  HostName $GITEA_HOST
-  User git
-  IdentityFile $GITEA_KEY
-  IdentitiesOnly yes
-SSHCONF
-        chmod 600 "$HOME/.ssh/config"
-    fi
+    echo "  [install] fzf..."
+    sudo apt-get install -y fzf > /dev/null 2>&1
 fi
 
 # --- Done ---
