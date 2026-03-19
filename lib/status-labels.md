@@ -18,3 +18,16 @@ Label IDs vary by repo — you cannot hardcode them. To transition an issue's st
 3. **Add the new status label:** Use `mcp__gitea__add_issue_labels` with the label ID of the desired `status:` label.
 
 Always remove before adding to avoid an issue having two `status:` labels simultaneously.
+
+### Blocking Labels
+
+These non-status labels prevent agents from auto-picking issues:
+
+| Label | Meaning |
+|-------|---------|
+| `decision-needed` | A human decision is required before implementation can proceed. The issue comments contain the open question. Agents must not implement without the decision being resolved first. |
+
+When an agent encounters an issue with `decision-needed`:
+- **`/do-issue`**: Read the issue comments, present the pending decision to the user, and ask how to proceed before any implementation.
+- **`/triage-issues`**: Show these issues in a separate "Awaiting Decision" section, not in the recommended list.
+- **`/do-the-thing`**: Exclude from auto-recommendations unless the user explicitly requests them.

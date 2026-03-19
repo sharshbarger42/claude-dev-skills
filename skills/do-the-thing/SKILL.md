@@ -66,13 +66,19 @@ Read the triage output carefully. It will contain:
 
 **Exclude in-progress issues:** Remove any issues from the triage recommendations that are currently being worked on by another agent (from the active work list in Step 1b). These should not appear as options.
 
+**Exclude decision-needed issues:** Remove any issues with the `decision-needed` label from the triage recommendations. These require a human decision before implementation and should not be auto-suggested. If there are decision-needed issues, show a note:
+> **Awaiting human decision ({N} issues):**
+> - #{index} {title} — {1-line summary of pending question}
+>
+> Run `/do-issue {repo}#{index}` to resolve the decision and start work.
+
 If there are active items from Step 1b, show a note before the options:
 > **Other agents currently working on:**
 > - #{index} {title} — {agent_name} (started {relative_time}, {stale_warning if applicable})
 
 If any active item is flagged as possibly stale (>2h), append to that line: `(possibly stale — no completion after {duration})`
 
-Use `AskUserQuestion` to let the user pick an issue. Present the top recommended issues (excluding in-progress ones) from the triage output as options:
+Use `AskUserQuestion` to let the user pick an issue. Present the top recommended issues (excluding in-progress and decision-needed ones) from the triage output as options:
 
 - Option 1: **#{index} {title}** (the #1 recommended issue) — with description: "{1-line reason from triage}"
 - Option 2: **#{index} {title}** (the #2 recommended issue) — with description: "{1-line reason from triage}"

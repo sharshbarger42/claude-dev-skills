@@ -53,6 +53,25 @@ Use `mcp__gitea__get_issue_by_index` with the parsed `owner`, `repo`, and `index
 
 If the issue is not found, report the error and stop.
 
+## Step 2b: Check for pending decisions
+
+If the issue has a `decision-needed` label:
+
+1. Fetch the issue comments using `mcp__gitea__get_issue_comments`.
+2. Identify comments that contain open questions or decision requests (look for "Decision needed", question marks, options/alternatives being presented).
+3. Present the pending decision to the user:
+   ```
+   Issue #{index} has a `decision-needed` label. Before implementing, a human decision is required:
+
+   **Open question:** {summarize the decision from the comments}
+
+   {quote the relevant comment(s)}
+   ```
+4. Use `AskUserQuestion` with options:
+   - **Resolve and proceed** — the user provides their decision; remove the `decision-needed` label, post the decision as a comment on the issue, then continue with implementation
+   - **Skip this issue** — stop and suggest picking a different issue
+5. If the user resolves the decision, remove the `decision-needed` label from the issue before proceeding to Step 3.
+
 ## Step 3: Read repo AGENTS.md
 
 Use `mcp__gitea__get_file_content` to fetch `AGENTS.md` from the repo's default branch. Get the default branch name from the issue metadata (`repository.default_branch`) — do NOT hardcode `master` or `main`.
