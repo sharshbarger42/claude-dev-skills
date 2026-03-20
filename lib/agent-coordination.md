@@ -11,7 +11,7 @@ Register, query, and deregister active work across agents. Uses Gitea labels as 
 Before using any Agent Mail or Discord features in this lib, check if multi-agent mode is enabled:
 
 ```bash
-grep -q 'multi_agent: true' ~/.claude/env-config.yaml 2>/dev/null
+grep -q '^multi_agent: true$' ~/.claude/env-config.yaml 2>/dev/null
 ```
 
 If `multi_agent` is **not true**, skip all Agent Mail and Discord steps in this lib. Only Gitea label management (the authoritative signal) runs regardless of this flag.

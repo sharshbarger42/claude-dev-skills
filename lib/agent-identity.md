@@ -5,7 +5,7 @@ Derive a session-stable agent name and register presence via Agent Mail. Include
 **Multi-agent gate:** Before running any steps in this lib, check if multi-agent mode is enabled:
 
 ```bash
-grep -q 'multi_agent: true' ~/.claude/env-config.yaml 2>/dev/null
+grep -q '^multi_agent: true$' ~/.claude/env-config.yaml 2>/dev/null
 ```
 
 If `multi_agent` is **not true**, skip this entire lib. Agent names and registration are only needed when multiple agents coordinate.
