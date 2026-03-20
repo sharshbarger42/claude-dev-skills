@@ -137,7 +137,7 @@ The worktree will be automatically cleaned up when the session ends (you'll be p
 
 ## Step 8: Create PR
 
-Use `mcp__gitea__create_pull_request` with:
+Use `mcp__gitea__pull_request_write` with method `create`:
 - `owner`: from Step 1
 - `repo`: from Step 1
 - `title`: PR title derived from the issue (e.g., `feat(#18): add tandoor recipe integration`)
@@ -147,6 +147,8 @@ Use `mcp__gitea__create_pull_request` with:
   - `Closes #{index}` to auto-close the issue on merge
 - `head`: the feature branch name
 - `base`: the repo's default branch
+
+**IMPORTANT — PR body formatting:** Pass the `body` parameter as a real multi-line string with actual newlines. Do NOT use `\n` escape sequences — the Gitea MCP tool stores them literally, producing a single-line blob of `\n` characters instead of rendered markdown. Just write the body naturally across multiple lines in the parameter value.
 
 After creating the PR, **update the status label:** replace `status: in-progress` with `status: in-review` on the issue (see status-labels.md above for the swap procedure).
 
