@@ -1,0 +1,40 @@
+# Development Skills Environment Configuration
+# Fill this out before running setup, or leave blank to be prompted.
+
+# Mode: regular (full access) or sandbox (restricted writes, deny rules)
+mode: ""
+
+# Git identity
+git:
+  name: ""
+  email: ""
+
+# Gitea configuration
+gitea:
+  url: "https://git.home.superwerewolves.ninja"
+  ssh: "ssh://gitea@git.home.superwerewolves.ninja:2222"
+  org: "super-werewolves"
+
+# Development types — uncomment what applies
+dev_types: []
+  # - web-fullstack    # Node.js, TypeScript
+  # - python           # Python 3, pip, venv
+  # - go               # Go toolchain
+  # - rust             # Rust toolchain
+
+# Dotfiles repo
+dotfiles:
+  url: ""
+  packages: []
+
+# Optional enhancements
+enhancements:
+  tmux: false
+  ohmyzsh: true
+  ohmyzsh_extra_plugins: []
+
+# Sudo permissions (sandbox mode only)
+sudo:
+  apt_install: true
+  apt_update: true
+  systemctl: false

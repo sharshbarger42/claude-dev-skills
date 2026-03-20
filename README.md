@@ -59,14 +59,25 @@ development-skills/
 │   ├── review-pr/          # Automated PR code review
 │   ├── fix-pr/             # Address PR review comments
 │   ├── merge-prs/          # Merge ready PRs with deploy monitoring
+│   ├── qa-pr/              # Quality assurance on PR
 │   ├── triage-issues/      # Prioritize repo issues
+│   ├── gwt/                # GIVEN/WHEN/THEN acceptance criteria from issues
+│   ├── test/               # E2E test planning and execution
+│   ├── status/             # Session catch-up and status summary
 │   ├── start/              # Full workspace orientation
 │   └── start-quick/        # Quick orientation
-└── planning-skills/        # Planning skills
-    ├── analyze-idea/        # Critical analysis of a problem/solution
-    ├── plan-project/        # Detailed technical project plan
-    ├── create-issues/       # Turn a plan into Gitea milestones + issues
-    └── plan-the-thing/      # Full planning loop (analyze → plan → issues)
+├── planning-skills/        # Planning skills
+│   ├── analyze-idea/        # Critical analysis of a problem/solution
+│   ├── plan-project/        # Detailed technical project plan
+│   ├── create-issues/       # Turn a plan into Gitea milestones + issues
+│   └── plan-the-thing/      # Full planning loop (analyze → plan → issues)
+├── plugins/                # Claude Code plugins
+│   ├── sound-notifications/ # System sounds on input needed / task done
+│   └── productivity-hooks/  # AGENTS.md injection, context hooks, Discord on stop
+└── setup/                  # WSL sandbox provisioning
+    ├── wsl-sandbox/         # setup-windows.ps1, setup-linux.sh, teardown
+    ├── env-config.yaml      # Environment configuration template
+    └── dotfiles-defaults/   # Fallback shell/tmux configs
 ```
 
 ## Skills
@@ -83,6 +94,10 @@ development-skills/
 | `/triage-issues repo` | Prioritize open issues |
 | `/start [repo]` | Full workspace orientation |
 | `/start-quick [repo]` | Quick orientation |
+| `/gwt repo#N [--with-data]` | Generate GIVEN/WHEN/THEN acceptance criteria from an issue |
+| `/test repo#N` | Plan, document, and execute E2E tests for an issue |
+| `/status` | Catch-up summary — active sessions, git activity, suggested next actions |
+| `/setup-env` | Interactive environment setup — Gitea, Discord, AGENTS.md, plugins, tools |
 
 ### Planning (`./install.sh planning`)
 
@@ -114,3 +129,37 @@ Secrets are never committed. They're read at runtime:
 - **code-review-agent token**: `$HOME/.config/code-review-agent/token`
 - **MCP server tokens**: `~/.mcp.json` and `~/.claude.json`
 - **API keys**: MCP server env vars
+
+## Plugins
+
+Register the marketplace, then install plugins:
+
+```bash
+claude plugin marketplace add ~/gitea-repos/development-skills
+claude plugin install sound-notifications@super-werewolves-skills --scope user
+claude plugin install productivity-hooks@super-werewolves-skills --scope user
+```
+
+| Plugin | Purpose |
+|--------|---------|
+| `sound-notifications` | System sounds on Notification (needs input) and Stop (task done). Cross-platform: Termux/Android, WSL, macOS, Linux. |
+| `productivity-hooks` | Injects AGENTS.md rules + project context on every prompt, enforces rules in subagents, sends Discord notification on session stop. |
+
+## WSL Sandbox Setup
+
+For Windows/WSL environments, provision an isolated Ubuntu-Claude distro:
+
+```powershell
+# From PowerShell (Admin):
+.\setup\wsl-sandbox\setup-windows.ps1          # Create distro + terminal profile
+.\setup\wsl-sandbox\setup-windows.ps1 -DryRun  # Preview changes
+.\setup\wsl-sandbox\setup-windows.ps1 -Defaults # No prompts
+
+# Inside Ubuntu-Claude:
+~/development-skills/setup/wsl-sandbox/setup-linux.sh  # Install tools + skills
+
+# Teardown:
+.\setup\wsl-sandbox\teardown-windows.ps1        # Remove distro + cleanup
+```
+
+Features: controlled sudo, automount disabled, Gitea SSH key generation, dotfiles stow, backup/restore across teardown cycles.
