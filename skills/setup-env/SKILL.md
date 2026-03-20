@@ -44,7 +44,7 @@ Set via `git config --global` if not already set.
 
 ### 2b. Gitea Access
 
-Verify Gitea is reachable (follow redirects, try both HTTP and HTTPS):
+Verify Gitea is reachable (follow redirects):
 
 ```bash
 curl -sL -o /dev/null -w "%{http_code}" https://{gitea_host}/api/v1/settings/api 2>/dev/null
@@ -125,7 +125,11 @@ AskUserQuestion:
    }
    ```
 
-   If `~/.mcp.json` already exists (with other MCP servers), merge the `"gitea"` key into the existing JSON. Do not overwrite other entries.
+   If `~/.mcp.json` already exists (with other MCP servers):
+   1. Back up the file first: `cp ~/.mcp.json ~/.mcp.json.bak`
+   2. Read the existing JSON, merge the `"gitea"` key into it. Do not overwrite other entries.
+   3. Write the result to a temp file, validate it is parseable JSON (`jq . /tmp/mcp-merged.json`), then move it into place: `mv /tmp/mcp-merged.json ~/.mcp.json`
+   4. If validation fails, restore from backup: `cp ~/.mcp.json.bak ~/.mcp.json`
 
 3. Set `chmod 600 ~/.mcp.json` to protect the token.
 
@@ -192,7 +196,7 @@ grep -q '"mcp-agent-mail"' ~/.mcp.json 2>/dev/null || grep -q '"mcp-agent-mail"'
    }
    ```
 
-   If `~/.mcp.json` already exists, merge the key. Do not overwrite other entries.
+   If `~/.mcp.json` already exists, use the same backup-validate-move procedure from Step 2d to merge the key safely. Do not overwrite other entries.
 
 The Agent Mail server runs locally — no tokens or external auth needed for single-machine setups.
 
@@ -367,13 +371,14 @@ Tools:
 
 ## Step 6: Save Config
 
-Save the final configuration to `~/.claude/env-config.yaml`. Ensure the `multi_agent` flag is included:
+Save the final configuration to `~/.claude/env-config.yaml`. Ensure these flags are included:
 
 ```yaml
 multi_agent: true  # or false
+ssh_key_generated: true  # or false — tracks whether a new SSH key was generated but may not yet be added to Gitea
 ```
 
-Skills and libs read this flag to decide whether to use Agent Mail and agent coordination features.
+Skills and libs read `multi_agent` to decide whether to use Agent Mail and agent coordination features. The `ssh_key_generated` flag persists across sessions so "Re-apply" can remind the user to add the key to Gitea.
 
 ## Step 7: Report Summary
 
