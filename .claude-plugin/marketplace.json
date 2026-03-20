@@ -1,0 +1,23 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "super-werewolves-skills",
+  "description": "Dev workflow automation, hooks, and notifications for Gitea-hosted homelab repos.",
+  "owner": {
+    "name": "super-werewolves",
+    "email": "selina@superwerewolves.ninja"
+  },
+  "plugins": [
+    {
+      "name": "sound-notifications",
+      "description": "Plays system sounds when Claude needs input or finishes a task. Cross-platform: Termux, WSL, macOS, Linux.",
+      "category": "productivity",
+      "source": "./plugins/sound-notifications"
+    },
+    {
+      "name": "productivity-hooks",
+      "description": "Injects project context on every prompt, enforces AGENTS.md in subagents, sends Discord notifications on session end.",
+      "category": "productivity",
+      "source": "./plugins/productivity-hooks"
+    }
+  ]
+}
