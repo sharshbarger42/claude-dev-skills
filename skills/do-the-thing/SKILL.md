@@ -40,11 +40,9 @@ Infer the repo from the current working directory:
 
 Derive your `AGENT_NAME` for this session.
 
-!`cat $HOME/.claude/development-skills/lib/agent-coordination.md`
-
 !`cat $HOME/.claude/development-skills/lib/discord-notify.md`
 
-Use the **Query Active Work** procedure from `agent-coordination.md` to discover what other agents are currently working on in this repo. Store the list of active items (issue index, agent name, started timestamp, staleness flag) for use in Step 3.
+The `/triage-issues` child skill includes `agent-coordination.md` and will report any in-progress items from other agents. Use that output in Step 3 to exclude them from the options.
 
 ## Step 2: Triage issues
 

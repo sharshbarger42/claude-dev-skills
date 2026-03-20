@@ -74,7 +74,7 @@ If the issue has a `decision-needed` label:
 
 ## Step 3: Read repo AGENTS.md
 
-Use `mcp__gitea__get_file_content` to fetch `AGENTS.md` from the repo's default branch. Get the default branch name from the issue metadata (`repository.default_branch`) — do NOT hardcode `master` or `main`.
+Use `mcp__gitea__get_file_contents` to fetch `AGENTS.md` from the repo's default branch. Get the default branch name from the issue metadata (`repository.default_branch`) — do NOT hardcode `master` or `main`.
 
 If AGENTS.md doesn't exist, note that no repo-specific coding standards were found and proceed without it.
 
@@ -189,7 +189,7 @@ Responding to review comments:
 
 After the code changes are finalized, check if the repo's README or other user-facing docs need updating to reflect the new functionality.
 
-1. Read the repo's `README.md` (use `mcp__gitea__get_file_content` or the local file)
+1. Read the repo's `README.md` (use `mcp__gitea__get_file_contents` or the local file)
 2. Check whether the changes from this issue introduce:
    - New commands, endpoints, or features that users interact with
    - New configuration options

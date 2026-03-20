@@ -2,7 +2,7 @@
 name: test
 description: Plan, document, and execute end-to-end tests for a Gitea issue. Reads the issue and codebase, builds a test plan, handles test data setup, and runs tests. Use when the user says "test this issue", "write e2e tests for", "run tests for [issue]", or "verify [issue] works".
 argument-hint: [repo#issue]
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, AskUserQuestion, mcp__gitea__get_issue_by_index, mcp__gitea__get_issue_comments_by_index, mcp__gitea__get_file_content
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, AskUserQuestion, mcp__gitea__get_issue_by_index, mcp__gitea__get_issue_comments_by_index, mcp__gitea__get_file_contents
 ---
 
 # End-to-End Test
