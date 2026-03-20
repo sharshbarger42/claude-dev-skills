@@ -77,20 +77,126 @@ Check if SSH is already configured and working:
 
 Do NOT ask the user to add the key to Gitea during this step. Defer that to the summary in Step 7 so setup can continue uninterrupted.
 
-### 2d. Discord Webhook (optional)
+### 2d. Gitea MCP
+
+Many skills (`/do-issue`, `/review-pr`, `/fix-pr`, `/triage-issues`, `/test`, `/gwt`, etc.) require the Gitea MCP server to interact with issues, PRs, and repo contents. This step ensures it's configured.
+
+**Check if already configured:**
+
+```bash
+grep -q '"gitea"' ~/.mcp.json 2>/dev/null || grep -q '"gitea"' ~/.claude.json 2>/dev/null
+```
+
+**If already configured**, report it and move on.
+
+**If not configured**, the user needs a Gitea API token. Use AskUserQuestion:
+
+```
+AskUserQuestion:
+  question: "Gitea MCP is required for most skills. Do you have a Gitea API token?"
+  options: ["Yes, I have a token", "No, I need to create one", "Skip (skills that use Gitea won't work)"]
+```
+
+- **"Yes, I have a token"** — ask for the token value in a follow-up AskUserQuestion (free-text input is appropriate here since it's a secret).
+- **"No, I need to create one"** — tell the user to create one at `{gitea_url}/user/settings/applications` (under "Manage Access Tokens"), then ask for it.
+- **"Skip"** — warn that `/do-issue`, `/review-pr`, `/fix-pr`, `/triage-issues`, `/test`, and `/gwt` will not work, then move on.
+
+**Once the token is provided:**
+
+1. **Ensure `gitea-mcp` binary is installed.** Check if it's already on PATH:
+   ```bash
+   command -v gitea-mcp
+   ```
+   If not found, install it:
+   ```bash
+   go install gitea.com/gitea/gitea-mcp@latest
+   ```
+   If `go` is not installed, download the latest release binary from `https://gitea.com/gitea/gitea-mcp/releases` and place it in `/usr/local/bin`.
+
+2. **Write or update `~/.mcp.json`:**
+
+   If `~/.mcp.json` doesn't exist, create it:
+   ```json
+   {
+     "gitea": {
+       "command": "gitea-mcp",
+       "args": ["-t", "stdio", "--host", "{gitea_url}", "--token", "{token}"]
+     }
+   }
+   ```
+
+   If `~/.mcp.json` already exists (with other MCP servers), merge the `"gitea"` key into the existing JSON. Do not overwrite other entries.
+
+3. Set `chmod 600 ~/.mcp.json` to protect the token.
+
+### 2e. Multi-Agent Mode
+
+```
+AskUserQuestion:
+  question: "Enable multi-agent coordination? (Agent Mail, file reservations, Discord notifications between agents)"
+  options: ["No — single agent only", "Yes — multi-agent"]
+```
+
+Save the choice as `multi_agent: true/false` in `~/.claude/env-config.yaml`.
+
+If **multi-agent is enabled**, continue to Steps 2f (Discord) and 2g (Agent Mail).
+If **single-agent**, skip both and go to Step 2h (Dev Types).
+
+### 2f. Discord Webhook (only if multi_agent: true)
 
 Use AskUserQuestion with options:
 
 ```
 AskUserQuestion:
-  question: "Configure Discord webhook for notifications?"
+  question: "Configure Discord webhook for agent notifications?"
   options: ["Skip", "Enter webhook URL"]
 ```
 
 If "Enter webhook URL" is selected, ask for the URL in a follow-up question.
 If provided, save to `~/.config/development-skills/discord-webhook` with `chmod 600`.
 
-### 2e. Dev Types (optional)
+### 2g. Agent Mail MCP (only if multi_agent: true)
+
+Agent Mail enables inter-agent messaging, file reservations, and coordination. Uses the Rust implementation (`mcp_agent_mail_rust`) for reliability under concurrent workloads.
+
+**Check if already configured:**
+
+```bash
+grep -q '"mcp-agent-mail"' ~/.mcp.json 2>/dev/null || grep -q '"mcp-agent-mail"' ~/.claude.json 2>/dev/null
+```
+
+**If already configured**, report it and move on.
+
+**If not configured:**
+
+1. **Check if `am` binary is installed:**
+   ```bash
+   command -v am
+   ```
+
+2. **If not installed**, install it:
+   ```bash
+   curl -fsSL "https://raw.githubusercontent.com/Dicklesworthstone/mcp_agent_mail_rust/main/install.sh" | bash
+   ```
+   This installs the `am` binary and sets up the server.
+
+3. **Write or update `~/.mcp.json`:**
+
+   Add the `mcp-agent-mail` entry:
+   ```json
+   {
+     "mcp-agent-mail": {
+       "command": "am",
+       "args": ["mcp"]
+     }
+   }
+   ```
+
+   If `~/.mcp.json` already exists, merge the key. Do not overwrite other entries.
+
+The Agent Mail server runs locally — no tokens or external auth needed for single-machine setups.
+
+### 2h. Dev Types (optional)
 
 Use AskUserQuestion with multi-select style options:
 
@@ -102,7 +208,7 @@ AskUserQuestion:
 
 If the user needs multiple (but not all), ask again after each selection until they say done, or use a follow-up question.
 
-### 2f. Batch Confirmation
+### 2i. Batch Confirmation
 
 Present all collected values, then use AskUserQuestion:
 
@@ -112,7 +218,10 @@ AskUserQuestion:
     Configuration:
     - Git: {name} <{email}>
     - Gitea: {url} (SSH: {ssh_status})
-    - Discord: {configured/not configured}
+    - Gitea MCP: {configured/skipped}
+    - Multi-agent: {enabled/disabled}
+    - Agent Mail MCP: {configured/skipped/n/a}
+    - Discord: {configured/not configured/n/a}
     - Dev types: {types or "none"}
   options: ["Confirm", "Edit a setting"]
 ```
@@ -241,9 +350,10 @@ Prerequisites:
   Gitea reachable:           {yes/no}
   SSH key:                   {configured and working / generated (needs adding to Gitea) / missing}
   development-skills linked: {yes/no}
-  Discord webhook:           {configured/not configured}
-  Agent Mail MCP:            {configured/not configured}
   Gitea MCP:                 {configured/not configured}
+  Multi-agent:               {enabled/disabled}
+  Agent Mail MCP:            {configured/not configured/n/a (single-agent)}
+  Discord webhook:           {configured/not configured/n/a (single-agent)}
 
 Plugins:
   sound-notifications:       {installed/not installed}
@@ -257,7 +367,13 @@ Tools:
 
 ## Step 6: Save Config
 
-Save the final configuration to `~/.claude/env-config.yaml`.
+Save the final configuration to `~/.claude/env-config.yaml`. Ensure the `multi_agent` flag is included:
+
+```yaml
+multi_agent: true  # or false
+```
+
+Skills and libs read this flag to decide whether to use Agent Mail and agent coordination features.
 
 ## Step 7: Report Summary
 
@@ -268,7 +384,10 @@ Save the final configuration to `~/.claude/env-config.yaml`.
 - Git: {name} <{email}>
 - Gitea: {url}
 - SSH: {configured / newly generated}
-- Discord: {status}
+- Gitea MCP: {configured / skipped}
+- Multi-agent: {enabled / disabled}
+- Agent Mail MCP: {configured / skipped / n/a}
+- Discord: {configured / skipped / n/a}
 - AGENTS.md: {created / already existed}
 
 ### Installed
@@ -296,8 +415,8 @@ Then continue with remaining next steps:
 
 ```
 ### Next Steps
-- {if ssh_key_generated: "Add the SSH key above to Gitea, then test with: ssh -T gitea@{gitea_host}"}
-- {any other manual steps — e.g. "Configure Gitea MCP"}
+- {if ssh_key_generated: "Add the SSH key above to Gitea, then test with: ssh -T -p 2222 gitea@{gitea_host}"}
+- {if gitea_mcp skipped: "Create a Gitea API token at {gitea_url}/user/settings/applications and re-run /setup-env to configure Gitea MCP"}
 - Run /start to begin your first session
 ```
 
