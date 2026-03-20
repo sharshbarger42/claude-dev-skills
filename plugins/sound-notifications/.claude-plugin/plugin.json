@@ -1,6 +1,8 @@
 {
   "name": "sound-notifications",
-  "version": "1.0.0",
-  "description": "Plays system sounds when Claude needs input or finishes a task",
-  "hooks": "../hooks/hooks.json"
+  "version": "1.1.0",
+  "description": "Plays system sounds when Claude needs input or finishes a task. Cross-platform: Termux, WSL, macOS, Linux.",
+  "author": {
+    "name": "super-werewolves"
+  }
 }
