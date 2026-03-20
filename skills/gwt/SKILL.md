@@ -13,12 +13,9 @@ If `--with-data` is included in the arguments, also explore the codebase to anno
 
 ## Step 1 — Resolve the issue
 
-Parse the issue reference from `$ARGUMENTS`. Supported formats:
-- `repo#123` — resolve owner/repo from the shorthand table at `~/.claude/development-skills/config/repos.md`
-- `owner/repo#123` — use directly
-- `#123` — use the current repo (detect from git remote)
+!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
 
-Read the shorthand table to resolve short names. Then fetch the issue using `mcp__gitea__get_issue`.
+Parse the issue reference from `$ARGUMENTS` using the resolution logic above. Then fetch the issue using `mcp__gitea__get_issue`.
 
 Capture:
 - Title

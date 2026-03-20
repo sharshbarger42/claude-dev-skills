@@ -13,12 +13,11 @@ Plan, document, and execute end-to-end tests for Gitea issue **$ARGUMENTS**.
 
 ## Phase 1: Understand the Issue
 
-1. **Resolve and fetch the issue.** Parse `$ARGUMENTS` using the same resolution logic as other skills:
-   - `repo#123` — resolve via shorthand table at `~/.claude/development-skills/config/repos.md`
-   - `owner/repo#123` — use directly
-   - `#123` — detect from current git remote
+1. **Resolve and fetch the issue.**
 
-   Fetch with `mcp__gitea__get_issue`. Also fetch comments with `mcp__gitea__get_issue_comments`. Capture:
+   !`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
+
+   Parse `$ARGUMENTS` using the resolution logic above. Fetch with `mcp__gitea__get_issue`. Also fetch comments with `mcp__gitea__get_issue_comments`. Capture:
    - Title, body, acceptance criteria
    - Labels (may indicate affected area)
    - Any linked PRs or related issues mentioned
