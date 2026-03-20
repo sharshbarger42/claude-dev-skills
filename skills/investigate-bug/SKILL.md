@@ -102,6 +102,8 @@ Present the classification to the user and confirm before investigating. Use `As
 
 ## Step 4: Investigate — gather evidence
 
+**Investigation round budget:** Track a shared round counter starting at 0. Increment it each time investigation loops back here from Step 5 ("Needs more investigation") or Step 6 (verification contradiction). If the counter reaches 2, do not loop again — proceed with what's known or offer the user the "Abandon" option.
+
 Run diagnostic commands based on the category. Collect structured evidence.
 
 ### K8s investigation toolkit
@@ -188,7 +190,7 @@ Record each verification as:
 - **Actual**: what happened
 - **Verdict**: CONFIRMED / PARTIAL / UNCONFIRMED
 
-If verification contradicts the diagnosis, go back to Step 4 with new information. Maximum 2 investigation rounds to avoid loops — if still unconfirmed after 2 rounds, proceed with what's known and note the uncertainty in the issue.
+If verification contradicts the diagnosis, go back to Step 4 with new information (this increments the shared round counter). If the round budget is exhausted (2 rounds), proceed with what's known and note the uncertainty in the issue.
 
 ## Step 7: Create Gitea issues
 
