@@ -16,13 +16,17 @@ case "$(uname -s)" in
         afplay /System/Library/Sounds/Funk.aiff &
         ;;
     Linux)
-        # WSL — route through PowerShell on Windows host
-        if grep -qi microsoft /proc/version 2>/dev/null; then
+        # WSLg provides PulseAudio but may not export PULSE_SERVER to subprocesses
+        if [[ -S /mnt/wslg/PulseServer ]] && [[ -z "$PULSE_SERVER" ]]; then
+            export PULSE_SERVER="unix:/mnt/wslg/PulseServer"
+        fi
+        # WSL — try PowerShell first, fall back to paplay (works with WSLg)
+        if grep -qi microsoft /proc/version 2>/dev/null && command -v powershell.exe >/dev/null 2>&1; then
             powershell.exe -ExecutionPolicy Bypass -Command "[System.Media.SystemSounds]::Exclamation.Play()" 2>/dev/null
         elif command -v paplay >/dev/null 2>&1; then
-            paplay /usr/share/sounds/freedesktop/stereo/dialog-warning.oga 2>/dev/null &
+            paplay /usr/share/sounds/freedesktop/stereo/dialog-warning.oga 2>/dev/null
         elif command -v aplay >/dev/null 2>&1; then
-            aplay /usr/share/sounds/sound-icons/prompt 2>/dev/null &
+            aplay /usr/share/sounds/sound-icons/prompt 2>/dev/null
         fi
         ;;
 esac

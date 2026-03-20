@@ -355,6 +355,41 @@ claude plugin install productivity-hooks@super-werewolves-skills --scope user
 
 Report status of each plugin.
 
+### 4d. Install Sound Dependencies (if sound-notifications installed)
+
+The sound-notifications plugin needs audio utilities to produce sound. The requirements depend on the platform:
+
+**WSL2 with WSLg:** Install `paplay` and freedesktop sound files. WSLg provides a PulseAudio server automatically.
+
+```bash
+# Check if WSLg PulseAudio is available
+if [[ -S /mnt/wslg/PulseServer ]] || [[ -n "$PULSE_SERVER" ]]; then
+    if ! command -v paplay &>/dev/null; then
+        sudo apt-get install -y pulseaudio-utils sound-theme-freedesktop
+    fi
+fi
+```
+
+**WSL2 without WSLg (interop enabled):** No install needed — the plugin calls `powershell.exe` directly.
+
+**Native Linux desktop:** Install PulseAudio utils if not present:
+
+```bash
+if ! command -v paplay &>/dev/null; then
+    sudo apt-get install -y pulseaudio-utils sound-theme-freedesktop
+fi
+```
+
+**macOS / Termux:** No install needed — uses built-in `afplay` / `termux-notification`.
+
+After install, verify sound works:
+
+```bash
+paplay /usr/share/sounds/freedesktop/stereo/complete.oga 2>/dev/null && echo "Sound works" || echo "Sound not working"
+```
+
+Report whether sound dependencies were installed and whether the test succeeded.
+
 ## Step 5: Verify Prerequisites
 
 Run a comprehensive check and report results:
@@ -373,6 +408,7 @@ Prerequisites:
 Plugins:
   sound-notifications:       {installed/not installed}
   productivity-hooks:        {installed/not installed}
+  sound dependencies:        {paplay installed / not needed / missing}
 
 Tools:
   node:                      {version or missing}

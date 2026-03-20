@@ -19,11 +19,15 @@ case "$(uname -s)" in
         afplay /System/Library/Sounds/Glass.aiff &
         ;;
     Linux)
-        # WSL — route through PowerShell on Windows host
-        if grep -qi microsoft /proc/version 2>/dev/null; then
+        # WSLg provides PulseAudio but may not export PULSE_SERVER to subprocesses
+        if [[ -S /mnt/wslg/PulseServer ]] && [[ -z "$PULSE_SERVER" ]]; then
+            export PULSE_SERVER="unix:/mnt/wslg/PulseServer"
+        fi
+        # WSL — try PowerShell first, fall back to paplay (works with WSLg)
+        if grep -qi microsoft /proc/version 2>/dev/null && command -v powershell.exe >/dev/null 2>&1; then
             powershell.exe -ExecutionPolicy Bypass -Command "[console]::Beep(600,150); [console]::Beep(900,200)" 2>/dev/null
         elif command -v paplay >/dev/null 2>&1; then
-            paplay /usr/share/sounds/freedesktop/stereo/complete.oga 2>/dev/null &
+            paplay /usr/share/sounds/freedesktop/stereo/complete.oga 2>/dev/null
         elif command -v beep >/dev/null 2>&1; then
             beep -f 600 -l 150 && beep -f 900 -l 200
         fi

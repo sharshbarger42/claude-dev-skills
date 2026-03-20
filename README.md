@@ -31,46 +31,12 @@ Then inside Claude Code:
 
 ```
 development-skills/
-├── .claude-plugin/
-│   └── plugin.json         # Plugin metadata (name, version, description)
-├── marketplace.json        # Marketplace catalog for plugin discovery
-├── install.sh              # Deprecated — points to /setup-env
-├── config/
-│   ├── repos.md            # Centralized repo shorthand table
-│   └── infrastructure.md   # IPs, domains, service URLs
-├── lib/
-│   ├── resolve-repo.md     # Shared repo-parsing instructions
-│   ├── agent-identity.md   # Agent name derivation + registration
-│   ├── agent-coordination.md  # Multi-agent work tracking
-│   ├── discord-notify.md   # Discord webhook templates
-│   ├── status-labels.md    # Status label lifecycle
-│   ├── review-checklists.md   # Code review checklists
-│   └── planning-common.md  # Shared planning logic (plan storage, repo creation)
-├── skills/                 # Workflow skills
-│   ├── do-issue/           # Implement a Gitea issue end-to-end
-│   ├── do-the-thing/       # Full dev loop (triage → implement → review → merge)
-│   ├── review-pr/          # Automated PR code review
-│   ├── fix-pr/             # Address PR review comments
-│   ├── merge-prs/          # Merge ready PRs with deploy monitoring
-│   ├── qa-pr/              # Quality assurance on PR
-│   ├── triage-issues/      # Prioritize repo issues
-│   ├── gwt/                # GIVEN/WHEN/THEN acceptance criteria from issues
-│   ├── test/               # E2E test planning and execution
-│   ├── status/             # Session catch-up and status summary
-│   ├── start/              # Full workspace orientation
-│   └── start-quick/        # Quick orientation
-├── planning-skills/        # Planning skills
-│   ├── analyze-idea/        # Critical analysis of a problem/solution
-│   ├── plan-project/        # Detailed technical project plan
-│   ├── create-issues/       # Turn a plan into Gitea milestones + issues
-│   └── plan-the-thing/      # Full planning loop (analyze → plan → issues)
-├── plugins/                # Claude Code plugins
-│   ├── sound-notifications/ # System sounds on input needed / task done
-│   └── productivity-hooks/  # AGENTS.md injection, context hooks, Discord on stop
-└── setup/                  # WSL sandbox provisioning
-    ├── wsl-sandbox/         # setup-windows.ps1, setup-linux.sh, teardown
-    ├── env-config.yaml      # Environment configuration template
-    └── dotfiles-defaults/   # Fallback shell/tmux configs
+├── config/              # Per-environment settings (infrastructure, repos)
+├── lib/                 # Shared libs included by skills (repo parsing, labels, coordination)
+├── skills/              # Workflow skills (see table below)
+├── planning-skills/     # Planning skills (analyze, plan, create issues)
+├── plugins/             # Claude Code plugins (sound-notifications, productivity-hooks)
+└── setup/               # WSL sandbox provisioning (setup-windows.ps1, setup-linux.sh)
 ```
 
 ## Skills
@@ -84,12 +50,15 @@ development-skills/
 | `/review-pr repo#N` | 4-pass automated code review |
 | `/fix-pr repo#N` | Address PR review comments |
 | `/merge-prs [repo]` | Merge ready PRs with deploy monitoring |
+| `/update-prs [repo] or [repo#N]` | Rebase stale PRs onto latest main and verify CI |
 | `/triage-issues repo` | Prioritize open issues |
+| `/investigate-bug <description or repo#issue>` | Reproduce, diagnose root cause, and file bug issues |
 | `/start [repo]` | Full workspace orientation |
 | `/start-quick [repo]` | Quick orientation |
 | `/gwt repo#N [--with-data]` | Generate GIVEN/WHEN/THEN acceptance criteria from an issue |
 | `/test repo#N` | Plan, document, and execute E2E tests for an issue |
 | `/status` | Catch-up summary — active sessions, git activity, suggested next actions |
+| `/clear` | Clear active session file when done with current work |
 | `/setup-env` | Interactive environment setup — Gitea, Discord, AGENTS.md, plugins, tools |
 
 ### Planning
@@ -107,9 +76,8 @@ Plans are stored in `~/plans/{date}-{slug}/` with `analysis.md`, `plan.md`, and 
 
 ## Config
 
-- `config/repos.md` — repo shorthand table (used by all skills)
 - `config/infrastructure.md` — IPs, domains, service URLs
-- `lib/resolve-repo.md` — shared repo-parsing logic with `!cat` include of repos.md
+- `lib/resolve-repo.md` — shared repo-parsing logic
 - `lib/planning-common.md` — plan storage, repo creation, information gathering patterns
 
 ### Per-VM customization
