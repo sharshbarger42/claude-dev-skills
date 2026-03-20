@@ -28,6 +28,45 @@ Read `~/.claude/projects/-home-selina/memory/MEMORY.md` — this
 contains lessons from previous sessions, gotchas, and the
 post-compaction checklist.
 
+### Step 2b: Check for active sessions
+
+Search for session files across repos:
+
+```bash
+find ~/gitea-repos -maxdepth 2 -name "SESSION-*.md" -type f 2>/dev/null
+```
+
+If session files are found:
+
+1. Read each one
+2. Derive your own agent ID: `AGENT_ID="$(echo "${CLAUDE_SESSION_ID:-unknown}" | cut -c1-8)"`
+3. **Auto-match your own session:** If one of the files is `SESSION-${AGENT_ID}.md`, that's yours — present it directly as a resume candidate. You don't need to ask "which is yours."
+4. **Other agents' sessions:** Any session files that don't match your agent ID belong to other agents. Present them as informational context (read-only) — never delete them.
+5. If **your session file exists**, present it and ask:
+   ```
+   Found your previous session:
+   - **Skill:** {skill}
+   - **Repo:** {repo}
+   - **Issue/PR:** #{index} — {title}
+   - **Last step:** {step}
+   - **Updated:** {timestamp}
+
+   {summary from "What we're doing" section}
+   ```
+   Use `AskUserQuestion`: **Resume this work** or **Start fresh** (clears YOUR session file only).
+
+   If other agents' sessions also exist, show them below as context:
+   ```
+   Other active sessions (read-only):
+   - {repo}/SESSION-{other_id}.md — {skill}: #{index} {title}
+   ```
+6. If **only other agents' session files exist** (none matching your ID), show them as context but skip the resume question.
+7. If **no session files** found, skip silently.
+
+If the user picks "Resume", include the session file's full content in your context so you can reference decisions and progress throughout the conversation.
+
+If the user says "Start fresh", delete only YOUR session file (`SESSION-${AGENT_ID}.md`). Never delete another agent's session file.
+
 ### Step 3: Register rules and acknowledge
 
 In your response, explicitly list:

@@ -307,7 +307,7 @@ Create `~/AGENTS.md` if it doesn't exist. This is the workspace-level guide that
 
 ## Tracking
 
-- SESSION.md files in each repo track active work context
+- `SESSION-{agent_id}.md` files in each repo track active work context (auto-written by skills, cleared with `/clear`)
 - Claude memory at ~/.claude/projects/ persists across sessions
 
 ## Skills Reference

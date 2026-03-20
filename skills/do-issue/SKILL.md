@@ -12,6 +12,20 @@ Implement a Gitea issue end-to-end: read the issue, write the code, create a PR,
 - Owner/repo: `super-werewolves/food-automation#18`
 - Full URL: `https://git.home.superwerewolves.ninja/super-werewolves/food-automation/issues/18`
 
+## Session persistence
+
+!`cat $HOME/.claude/development-skills/lib/session-state.md`
+
+At skill start, call **Session Read** to check for prior context. Then call **Session Write** after these milestones:
+- After Step 2 (issue fetched — record issue title, body summary)
+- After Step 4 (approach confirmed — record the chosen approach and user decisions)
+- After Step 7 (commit and push — record branch name, commit SHA)
+- After Step 8 (PR created — record PR number)
+- After Step 10 (review triage — record what was fixed vs deferred)
+At the end of Step 12 (report), call **Session Clear**.
+
+**Parent-child note:** If invoked from `/do-the-thing`, the parent manages the session file. Check if the session file already exists with `Skill: do-the-thing` — if so, skip all Session Write/Read/Clear and let the parent handle it.
+
 ## Step 1: Parse the issue reference
 
 Extract `owner`, `repo`, and issue `index` from the argument.

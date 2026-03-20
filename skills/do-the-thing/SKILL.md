@@ -13,6 +13,20 @@ Full development loop in one command: triage open issues, pick one, implement it
 
 If no argument is provided, infer the repo from context (see Step 1).
 
+## Session persistence
+
+!`cat $HOME/.claude/development-skills/lib/session-state.md`
+
+At skill start, call **Session Read** to check for prior context. Then call **Session Write** after these milestones:
+- After Step 1 (repo resolved — record target repo)
+- After Step 3 (issue chosen — record which issue and why)
+- After Step 4 (do-issue complete — record PR number, branch, review results)
+- After Step 5 (fix-pr complete — record what was fixed)
+- After Step 6 (merge complete — record merge result, deploy status)
+At the end of Step 7 (report), call **Session Clear**.
+
+**Parent-child note:** This skill invokes `do-issue`, `fix-pr`, and `merge-prs` as child skills. Those child skills also include `session-state.md`. To avoid the child overwriting this parent's session state, child skills should **skip Session Write/Read/Clear when invoked from a parent skill**. The child can detect this by checking if the session file already exists with a different `Skill:` header — if so, leave it alone and let the parent manage the session file.
+
 ## Step 1: Parse or infer the repo
 
 ### If an argument was provided
