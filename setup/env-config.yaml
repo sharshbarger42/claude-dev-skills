@@ -11,8 +11,8 @@ git:
 
 # Gitea configuration
 gitea:
-  url: "http://git.home.superwerewolves.ninja"
-  ssh: "ssh://gitea@192.168.0.174:2222"
+  url: "https://git.home.superwerewolves.ninja"
+  ssh: "ssh://gitea@git.home.superwerewolves.ninja:2222"
   org: "super-werewolves"
 
 # Development types — uncomment what applies

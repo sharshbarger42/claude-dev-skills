@@ -108,8 +108,11 @@ if [[ -f "$BACKUP_FILE" ]]; then
     read -rp "  Restore this data? (Y/n): " RESTORE_CHOICE
     if [[ "${RESTORE_CHOICE,,}" != "n" ]]; then
         echo "  Restoring..."
-        tar xzf "$BACKUP_FILE" -C "$HOME" 2>/dev/null
-        echo "  Done. Previous data restored."
+        if tar xzf "$BACKUP_FILE" -C "$HOME"; then
+            echo "  Done. Previous data restored."
+        else
+            echo "  [warn] Backup extraction had errors — some files may not have restored."
+        fi
         rm -f "$BACKUP_FILE"
         if [[ -f "${HOME}/.claude/env-config.yaml" ]]; then
             ENV_CONFIG="${HOME}/.claude/env-config.yaml"
