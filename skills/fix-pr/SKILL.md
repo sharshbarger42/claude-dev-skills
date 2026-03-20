@@ -152,16 +152,19 @@ Read the relevant files and address comments in priority order:
 1. **User comments** (always required) — implement exactly what the user asked for
 2. **Documentation comments** (always fix) — any comment requesting doc updates (README, AGENTS.md, code comments, docstrings, etc.) is always addressed directly regardless of severity. Never create a separate issue for documentation.
 3. **Bot `[critical]`** (required) — treat same as user comments, must be fixed
-4. **Bot `[warning]`** (fix or defer) — fix if the change is straightforward. If complex (requires architectural changes, new dependencies, or significant refactoring), create a Gitea issue instead using `mcp__gitea__create_issue` with title `"[review] {brief description}"` and body referencing the PR. If the issue describes a bug (broken behavior, correctness problem), label it with `bug` — see labeling procedure below.
+4. **Bot `[warning]`** (fix or defer) — fix if the change is straightforward. If complex (requires architectural changes, new dependencies, or significant refactoring), create a Gitea issue instead using `mcp__gitea__create_issue` with title `"[review] {brief description}"` and body referencing the PR. Label it with type and priority — see labeling procedure below.
 5. **Bot `[nit]`** (skip unless trivial) — only fix if the change is purely mechanical (rename, whitespace, typo). Skip all others
-6. **Issue creation** — for comments that explicitly say "create a ticket for X" or similar, use `mcp__gitea__create_issue`. If the issue describes a bug, label it with `bug`.
+6. **Issue creation** — for comments that explicitly say "create a ticket for X" or similar, use `mcp__gitea__create_issue`. Label it with type and priority.
 
 ### Labeling created issues
 
-When creating an issue that represents a bug (broken behavior, security vulnerability, correctness problem — NOT feature requests or refactoring):
-1. Call `mcp__gitea__list_repo_labels` to find the `bug` label ID for the repo
-2. Call `mcp__gitea__add_issue_labels` with the new issue index and the `bug` label ID
-3. If no `bug` label exists in the repo, skip labeling silently
+When creating an issue, apply both a **type** label and a **priority** label:
+
+1. Call `mcp__gitea__list_repo_labels` to find label IDs for the repo
+2. **Type label** — pick one: `bug` (broken behavior, security vulnerability, correctness problem), `enhancement` (improvement to existing functionality), or `feature` (new capability)
+3. **Priority label** — pick one based on severity/impact: `priority: high` (blocks users or other work), `priority: medium` (normal queue), or `priority: low` (nice to have)
+4. Call `mcp__gitea__add_issue_labels` with the new issue index and both label IDs
+5. If any label doesn't exist in the repo, skip it silently
 
 Follow the repo's AGENTS.md coding standards when making changes.
 

@@ -304,10 +304,10 @@ Body: PR #{pr_index} ({pr_title}) was merged and the deploy workflow completed s
       Investigate and fix.
 ```
 
-Create with `mcp__gitea__create_issue`, then label as bug:
-1. Call `mcp__gitea__list_repo_labels` to find the `bug` label ID for the repo
-2. Call `mcp__gitea__add_issue_labels` with the new issue index and the `bug` label ID
-3. If no `bug` label exists in the repo, skip labeling silently
+Create with `mcp__gitea__create_issue`, then label it:
+1. Call `mcp__gitea__list_repo_labels` to find label IDs for `bug` and `priority: high`
+2. Call `mcp__gitea__add_issue_labels` with the new issue index and both label IDs
+3. If any label doesn't exist in the repo, skip it silently
 
 ### If deploy failed
 
@@ -322,7 +322,7 @@ Body: PR #{pr_index} ({pr_title}) was merged but the deploy workflow failed.
       Investigate and fix the deployment.
 ```
 
-Create with `mcp__gitea__create_issue`, then label as bug (same procedure as above).
+Create with `mcp__gitea__create_issue`, then label as `bug` + `priority: high` (same procedure as above).
 
 ## Step 10: Report
 

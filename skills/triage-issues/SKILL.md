@@ -90,7 +90,9 @@ Score each actionable issue using these factors (higher = tackle sooner):
 |--------|--------|-----------|
 | Milestone due soon | +3 | Issue is in a milestone due within 7 days |
 | Milestone due eventually | +1 | Issue is in a milestone due within 30 days |
-| Has `priority` or `urgent` label | +3 | Case-insensitive label match |
+| Has `priority: high` label | +3 | Tackle first |
+| Has `priority: medium` label | +1 | Normal queue |
+| Has `priority: low` label | -1 | Nice to have, deprioritize |
 | Has `bug` or `fix` label | +2 | Bugs before features |
 | Has `enhancement` or `feature` label | +1 | Nice to have |
 | Low complexity signal | +1 | Body is under 500 characters (likely a small task) |

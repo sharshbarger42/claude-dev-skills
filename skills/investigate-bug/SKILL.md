@@ -223,10 +223,10 @@ For each affected repo, create a well-structured bug issue.
 
 ### Labeling procedure
 
-1. Call `mcp__gitea__list_repo_labels` to find the `bug` label ID for the target repo
+1. Call `mcp__gitea__list_repo_labels` to find label IDs for `bug` and a priority label (`priority: high` if service is down or data at risk, `priority: medium` for degraded functionality, `priority: low` for cosmetic or minor issues)
 2. Create the issue with `mcp__gitea__create_issue`
-3. Call `mcp__gitea__add_issue_labels` with the new issue index and the `bug` label ID
-4. If no `bug` label exists in the repo, skip labeling silently
+3. Call `mcp__gitea__add_issue_labels` with the new issue index and both label IDs (bug + priority)
+4. If any label doesn't exist in the repo, skip it silently
 
 ### Cross-referencing
 

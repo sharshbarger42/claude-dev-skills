@@ -166,7 +166,7 @@ This contract is needed because the following features depend on a shared {type}
 **IMPORTANT:** This contract MUST be completed and merged before any dependent issues can begin work. Dependent issues are tagged with `depends-on: #{this_issue_number}`.
 ```
 - `milestone`: assign to the earliest milestone that contains a dependent feature
-- `labels`: add `contract`, `priority`
+- `labels`: add `contract`, `priority: high` (contracts block other work), and `feature`
 
 Store the created issue numbers — these will be referenced as blockers.
 
@@ -223,7 +223,7 @@ Use `mcp__gitea__create_issue`:
 - [ ] No regressions
 ```
 - `milestone`: the milestone ID for this phase
-- `labels`: `enhancement` (or `bug` if it's a fix)
+- `labels`: type label (`feature`, `enhancement`, or `bug`), plus a priority label (`priority: high`, `priority: medium`, or `priority: low` — based on milestone urgency and user impact)
 
 Store created issue numbers for sub-issue references.
 
@@ -288,7 +288,7 @@ Sub-issue of #{parent_feature_issue_number} — {parent title}
 - [ ] All existing tests still pass
 ```
 - `milestone`: same milestone as the parent feature
-- `labels`: `sub-issue`, `{sub-issue type}`
+- `labels`: `sub-issue`, `{sub-issue type}` (NO priority label — sub-issues inherit priority from their parent feature)
 
 ## Step 9: Add dependency labels
 
