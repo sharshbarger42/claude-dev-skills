@@ -1,6 +1,6 @@
 {
   "name": "productivity-hooks",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Injects project context on every prompt, enforces AGENTS.md in subagents, sends Discord notifications on session end.",
   "author": {
     "name": "super-werewolves"
