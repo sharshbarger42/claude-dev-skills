@@ -21,30 +21,24 @@ Extract `owner` and `repo` from the argument.
 
 #### Repo resolution
 
-!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
+Use the repo resolution logic from the `/triage-issues` skill (which includes `resolve-repo.md`).
 
 ### If no argument was provided
 
 Infer the repo from the current working directory:
 
 1. Run `git remote get-url origin` via Bash to get the remote URL
-2. Match the URL against the shorthand table from the repo resolution logic above
+2. Match the URL against the shorthand table (the triage step will resolve it)
 3. If a match is found, use `AskUserQuestion` to confirm:
    - Option 1: **Yes, use {repo}** — proceed with the inferred repo
    - Option 2: **Different repo** — user types the shorthand name
-4. If no match is found (not in a git repo, or remote doesn't match any known repo), use `AskUserQuestion` to ask which repo to use, listing all repos from the shorthand table as options
+4. If no match is found (not in a git repo, or remote doesn't match any known repo), use `AskUserQuestion` to ask which repo to use
 
-## Step 1b: Establish identity and discover active work
+## Step 1b: Discover active work
 
-!`cat $HOME/.claude/development-skills/lib/agent-identity.md`
+The `/triage-issues`, `/do-issue`, and `/fix-pr` child skills each include the identity, coordination, and notification libs they need. Do not duplicate those includes here.
 
-Derive your `AGENT_NAME` for this session.
-
-!`cat $HOME/.claude/development-skills/lib/agent-coordination.md`
-
-!`cat $HOME/.claude/development-skills/lib/discord-notify.md`
-
-Use the **Query Active Work** procedure from `agent-coordination.md` to discover what other agents are currently working on in this repo. Store the list of active items (issue index, agent name, started timestamp, staleness flag) for use in Step 3.
+If `/triage-issues` (Step 2) reports any in-progress items from other agents, use that information in Step 3 to exclude them from the options.
 
 ## Step 2: Triage issues
 

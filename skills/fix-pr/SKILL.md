@@ -119,7 +119,7 @@ For each actionable comment, extract:
 
 ## Step 5: Read repo AGENTS.md
 
-Use `mcp__gitea__get_file_content` to fetch `AGENTS.md` from the repo's default branch (from Step 2 metadata — do NOT hardcode `master` or `main`).
+Use `mcp__gitea__get_file_contents` to fetch `AGENTS.md` from the repo's default branch (from Step 2 metadata — do NOT hardcode `master` or `main`).
 
 If AGENTS.md doesn't exist, note that no repo-specific coding standards were found and proceed without it.
 
