@@ -38,7 +38,7 @@ If the diff is larger than 100KB, note this and focus the review on the largest 
 
 ## Step 4: Extract review standards from AGENTS.md
 
-1. Use `mcp__gitea__get_file_content` to fetch `AGENTS.md` from the repo's default branch (from Step 2 metadata — do NOT hardcode `master` or `main`).
+1. Use `mcp__gitea__get_file_contents` to fetch `AGENTS.md` from the repo's default branch (from Step 2 metadata — do NOT hardcode `master` or `main`).
 2. Look for the `## Code Review Standards` heading in the file content.
 3. Extract from that heading to the next `## ` heading or end of file.
 4. If the `## Code Review Standards` section is not found, fall back to the full AGENTS.md content.

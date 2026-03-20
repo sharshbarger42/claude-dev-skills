@@ -2,7 +2,7 @@
 name: gwt
 description: Format Gitea issue requirements into GIVEN/WHEN/THEN acceptance criteria scenarios, optionally enriched with real data from the codebase. Use when the user asks to "format requirements", "write acceptance criteria", "generate BDD scenarios", "create given when then for", or "write gwt for [issue]".
 argument-hint: [repo#issue] [--with-data]
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, mcp__gitea__get_issue_by_index, mcp__gitea__get_issue_comments_by_index, mcp__gitea__get_file_content
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, mcp__gitea__get_issue_by_index, mcp__gitea__get_issue_comments_by_index, mcp__gitea__get_file_contents
 ---
 
 # GIVEN / WHEN / THEN Formatter
