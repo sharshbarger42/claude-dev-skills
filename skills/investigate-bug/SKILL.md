@@ -172,6 +172,7 @@ Present the diagnosis to the user for confirmation before creating issues. Use `
 - **Confirmed — create issues** — proceed to Step 6
 - **Needs more investigation** — go back to Step 4 with user guidance
 - **Wrong direction** — user provides corrected hypothesis
+- **Abandon — do not file issues** — investigation inconclusive, stop without creating issues
 
 ## Step 6: Verify the bug
 
@@ -244,13 +245,15 @@ Use `mcp__gitea__create_issue_comment` with the original issue's owner, repo, an
 Post a Discord notification (orange/red embed, color 15158332) for bug investigation complete:
 
 ```bash
+SAFE_BUG_SUMMARY="${BUG_SUMMARY//\"/\\\"}"
+SAFE_ROOT_CAUSE="${ROOT_CAUSE//\"/\\\"}"
 curl -s -X POST "$DISCORD_WEBHOOK" \
   -H "Content-Type: application/json" \
   -d "$(cat <<EOF
 {
   "embeds": [{
-    "title": "Bug Investigated: ${BUG_SUMMARY}",
-    "description": "**Agent:** ${AGENT_NAME}\n**Diagnosis:** ${ROOT_CAUSE}\n**Issues created:** ${ISSUE_COUNT}\n**Confidence:** ${CONFIDENCE}",
+    "title": "Bug Investigated: ${SAFE_BUG_SUMMARY}",
+    "description": "**Agent:** ${AGENT_NAME}\n**Diagnosis:** ${SAFE_ROOT_CAUSE}\n**Issues created:** ${ISSUE_COUNT}\n**Confidence:** ${CONFIDENCE}",
     "color": 15158332,
     "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   }]
