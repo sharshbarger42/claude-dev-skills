@@ -2,7 +2,7 @@
 name: gwt
 description: Format Gitea issue requirements into GIVEN/WHEN/THEN acceptance criteria scenarios, optionally enriched with real data from the codebase. Use when the user asks to "format requirements", "write acceptance criteria", "generate BDD scenarios", "create given when then for", or "write gwt for [issue]".
 argument-hint: [repo#issue] [--with-data]
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, mcp__gitea__get_issue, mcp__gitea__get_issue_comments, mcp__gitea__get_repo_file_contents, mcp__gitea__list_repo_topics
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, mcp__gitea__get_issue_by_index, mcp__gitea__get_issue_comments_by_index, mcp__gitea__get_file_content
 ---
 
 # GIVEN / WHEN / THEN Formatter
@@ -15,13 +15,13 @@ If `--with-data` is included in the arguments, also explore the codebase to anno
 
 !`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
 
-Parse the issue reference from `$ARGUMENTS` using the resolution logic above. Then fetch the issue using `mcp__gitea__get_issue`.
+Parse the issue reference from `$ARGUMENTS` using the resolution logic above. Then fetch the issue using `mcp__gitea__get_issue_by_index`.
 
 Capture:
 - Title
 - Body (requirements, acceptance criteria, notes)
 - Labels (may indicate feature area, priority, etc.)
-- Comments (may contain clarifications or additional requirements) — fetch with `mcp__gitea__get_issue_comments`
+- Comments (may contain clarifications or additional requirements) — fetch with `mcp__gitea__get_issue_comments_by_index`
 
 ## Step 2 — Extract scenarios
 
