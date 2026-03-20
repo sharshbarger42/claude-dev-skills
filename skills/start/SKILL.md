@@ -40,17 +40,11 @@ If session files are found:
 
 1. Read each one
 2. Derive your own agent ID: `AGENT_ID="$(echo "${CLAUDE_SESSION_ID:-unknown}" | cut -c1-8)"`
-3. If **multiple session files** exist, present a summary of each and ask which one is yours:
+3. **Auto-match your own session:** If one of the files is `SESSION-${AGENT_ID}.md`, that's yours — present it directly as a resume candidate. You don't need to ask "which is yours."
+4. **Other agents' sessions:** Any session files that don't match your agent ID belong to other agents. Present them as informational context (read-only) — never delete them.
+5. If **your session file exists**, present it and ask:
    ```
-   Found active sessions:
-
-   1. **{repo}/SESSION-{id1}.md** — {skill}: #{index} {title} (step: {step}, updated: {timestamp})
-   2. **{repo}/SESSION-{id2}.md** — {skill}: #{index} {title} (step: {step}, updated: {timestamp})
-   ```
-   Use `AskUserQuestion` with each session as an option plus a "None — starting fresh" option.
-4. If **one session file** exists, present it and ask if the user wants to resume:
-   ```
-   Found a previous session:
+   Found your previous session:
    - **Skill:** {skill}
    - **Repo:** {repo}
    - **Issue/PR:** #{index} — {title}
@@ -59,12 +53,19 @@ If session files are found:
 
    {summary from "What we're doing" section}
    ```
-   Use `AskUserQuestion`: **Resume this work** or **Start fresh** (clears the session file).
-5. If **no session files** found, skip silently.
+   Use `AskUserQuestion`: **Resume this work** or **Start fresh** (clears YOUR session file only).
 
-If the user picks a session, include its full content in your context so you can reference decisions and progress throughout the conversation.
+   If other agents' sessions also exist, show them below as context:
+   ```
+   Other active sessions (read-only):
+   - {repo}/SESSION-{other_id}.md — {skill}: #{index} {title}
+   ```
+6. If **only other agents' session files exist** (none matching your ID), show them as context but skip the resume question.
+7. If **no session files** found, skip silently.
 
-If the user says "start fresh", delete the session file(s) that were presented.
+If the user picks "Resume", include the session file's full content in your context so you can reference decisions and progress throughout the conversation.
+
+If the user says "Start fresh", delete only YOUR session file (`SESSION-${AGENT_ID}.md`). Never delete another agent's session file.
 
 ### Step 3: Register rules and acknowledge
 

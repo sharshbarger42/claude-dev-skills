@@ -23,6 +23,8 @@ At skill start, call **Session Read** to check for prior context. Then call **Se
 - After Step 9 (committed and pushed — record commit SHA, files changed)
 At the end of Step 11 (report), call **Session Clear**.
 
+**Parent-child note:** If invoked from `/do-the-thing`, the parent manages the session file. Check if the session file already exists with `Skill: do-the-thing` — if so, skip all Session Write/Read/Clear and let the parent handle it.
+
 ## Step 1: Parse the PR reference
 
 Extract `owner`, `repo`, and PR `index` from the argument.

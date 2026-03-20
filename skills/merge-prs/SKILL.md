@@ -24,6 +24,8 @@ At skill start, call **Session Read** to check for prior context. Then call **Se
 - After Step 9 (health checks done — record deploy/health results)
 At the end of Step 10 (report), call **Session Clear**.
 
+**Parent-child note:** If invoked from `/do-the-thing`, the parent manages the session file. Check if the session file already exists with `Skill: do-the-thing` — if so, skip all Session Write/Read/Clear and let the parent handle it.
+
 ## Step 1: Parse optional repo argument
 
 If an argument was provided, extract `owner` and `repo`.

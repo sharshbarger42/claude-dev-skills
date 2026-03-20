@@ -121,4 +121,4 @@ Present as a numbered list:
 - **Don't print secrets.** If any files contain credentials, do not include them in output.
 - **Be concise.** The user wants a quick catch-up, not a novel. Use bullet points and short descriptions.
 - **Handle missing data gracefully.** If no session files exist and no git activity today, say so and suggest starting fresh.
-- **Respect time boundaries.** Only report on today's activity unless a SESSION.md has older context that's still relevant (check file modification time).
+- **Respect time boundaries.** Only report on today's activity unless a session file has older context that's still relevant (check file modification time).

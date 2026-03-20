@@ -11,11 +11,13 @@ The file is **overwritten** on each update — it represents current state, not 
 ## Derive session file path
 
 ```bash
-AGENT_ID="$(echo "${CLAUDE_SESSION_ID:-$(head -c 4 /dev/urandom | xxd -p)}" | cut -c1-8)"
+AGENT_ID="$(echo "${CLAUDE_SESSION_ID:-unknown}" | cut -c1-8)"
 SESSION_FILE="${REPO_LOCAL_PATH}/SESSION-${AGENT_ID}.md"
 ```
 
-Where `REPO_LOCAL_PATH` is the local checkout path of the repo being worked on (from the shorthand table in `config/repos.md`).
+**Important:** Always use `unknown` as the fallback when `CLAUDE_SESSION_ID` is unset. Never use random values — the same ID must be derived on every invocation so writes and reads target the same file. All files that derive an agent ID (this lib, `/clear`, `/start`) must use this exact same fallback.
+
+Where `REPO_LOCAL_PATH` is the local checkout path of the repo being worked on (from the shorthand table in `config/repos.md`). If the repo is not in the shorthand table, use the current working directory (`pwd`). Never leave `REPO_LOCAL_PATH` empty — validate it before writing.
 
 ## Session Write
 
@@ -90,14 +92,22 @@ rm -f "${SESSION_FILE}"
 
 ## Git safety
 
-Session files must NEVER be committed. The `session_write` procedure must ensure the target repo's `.gitignore` includes `SESSION-*.md`:
+Session files must NEVER be committed. Before the **first Session Write** in a skill run, check the gitignore:
 
-1. Check if `.gitignore` exists in the repo root
-2. If it exists, check if it already contains `SESSION-*.md`
-3. If not, append `SESSION-*.md` to the `.gitignore` (do NOT commit this change — leave it as an unstaged modification, or if `.gitignore` is already tracked, add the line and note it for the user)
-4. If `.gitignore` doesn't exist, create it with just `SESSION-*.md`
+1. Check if `.gitignore` exists in `REPO_LOCAL_PATH`
+2. If it exists, check if it already contains `SESSION-*.md` — if yes, skip
+3. If not present, warn the user: `"Note: SESSION-*.md is not in {repo}/.gitignore. Consider adding it to prevent accidental commits."`
 
-This is a one-time safety net per repo. Once the gitignore entry exists, skip this check.
+Do NOT modify `.gitignore` automatically — it creates unstaged changes that interfere with dirty-tree checks in other skills. The development-skills repo already has `SESSION-*.md` in its `.gitignore`. For other repos, the user should add it manually or it should be part of the repo's initial setup.
+
+## Parent-child skill handling
+
+`do-the-thing` invokes `do-issue`, `fix-pr`, and `merge-prs` as child skills. To avoid the child overwriting the parent's session state:
+
+1. At Session Read time, check if the session file already exists
+2. If it exists and its `Skill:` header is **different** from the current skill (e.g., file says `do-the-thing` but current skill is `do-issue`), this is a **parent-managed session**
+3. In parent-managed mode: skip all Session Write, Session Read presentation, and Session Clear — let the parent handle the file
+4. If the file doesn't exist, or the `Skill:` header matches the current skill, proceed normally
 
 ## Which skills should include this
 

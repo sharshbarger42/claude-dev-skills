@@ -24,6 +24,8 @@ At skill start, call **Session Read** to check for prior context. Then call **Se
 - After Step 10 (review triage — record what was fixed vs deferred)
 At the end of Step 12 (report), call **Session Clear**.
 
+**Parent-child note:** If invoked from `/do-the-thing`, the parent manages the session file. Check if the session file already exists with `Skill: do-the-thing` — if so, skip all Session Write/Read/Clear and let the parent handle it.
+
 ## Step 1: Parse the issue reference
 
 Extract `owner`, `repo`, and issue `index` from the argument.

@@ -1,7 +1,7 @@
 ---
 name: clear
 description: Clear the active session file when you're done with current work and moving on to something new.
-allowed-tools: Bash, Read, Glob
+allowed-tools: Bash, Read
 ---
 
 # Clear Session
@@ -41,7 +41,7 @@ If other session files exist (from other agents), note them but do NOT delete th
    - **Issue/PR:** #{index} — {title}
    - **Last step:** {step}
    ```
-2. Delete it: `rm -f {path}`
+2. Delete it: `rm -f "{path}"`
 3. Confirm: `Session cleared. Ready for new work.`
 
 ### If our session file does NOT exist but others do
