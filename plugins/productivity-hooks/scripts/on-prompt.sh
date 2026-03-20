@@ -3,6 +3,7 @@
 # Stdout is injected as context into the conversation.
 
 SKILLS_DIR="$HOME/.claude/development-skills"
+LOCAL_CONFIG="$HOME/.config/development-skills"
 AGENTS_FILES=()
 
 # Find AGENTS.md in current directory and parents (up to home)
@@ -45,15 +46,34 @@ if [[ ${#AGENTS_FILES[@]} -gt 0 ]]; then
     done
 fi
 
-# Inject repo shorthand if available
-if [[ -f "$SKILLS_DIR/config/repos.md" ]]; then
-    echo ""
-    echo "Repo shorthand table available at: $SKILLS_DIR/config/repos.md"
+# Inline project map (local config first, fall back to repo)
+repos_file=""
+if [[ -f "$LOCAL_CONFIG/repos.md" ]]; then
+    repos_file="$LOCAL_CONFIG/repos.md"
+elif [[ -f "$SKILLS_DIR/config/repos.md" ]]; then
+    repos_file="$SKILLS_DIR/config/repos.md"
 fi
 
-# Inject infrastructure reference if available
-if [[ -f "$SKILLS_DIR/config/infrastructure.md" ]]; then
-    echo "Infrastructure reference available at: $SKILLS_DIR/config/infrastructure.md"
+if [[ -n "$repos_file" ]]; then
+    echo ""
+    echo "<project-map>"
+    cat "$repos_file"
+    echo "</project-map>"
+fi
+
+# Inline infrastructure reference (local config first, fall back to repo)
+infra_file=""
+if [[ -f "$LOCAL_CONFIG/infrastructure.md" ]]; then
+    infra_file="$LOCAL_CONFIG/infrastructure.md"
+elif [[ -f "$SKILLS_DIR/config/infrastructure.md" ]]; then
+    infra_file="$SKILLS_DIR/config/infrastructure.md"
+fi
+
+if [[ -n "$infra_file" ]]; then
+    echo ""
+    echo "<infrastructure-reference>"
+    cat "$infra_file"
+    echo "</infrastructure-reference>"
 fi
 
 echo "</development-skills-context>"
