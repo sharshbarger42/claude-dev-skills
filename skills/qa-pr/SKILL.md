@@ -36,17 +36,101 @@ If the PR is already merged or closed, stop and tell the user.
 
 Look up the repo in this deploy configuration table:
 
-| Repo | Deploy workflow | Dev health URL | Dev base URL | Smoke endpoints |
-|------|----------------|----------------|--------------|-----------------|
-| `multi-agent-coordinator` | `deploy.yml` | `https://agents.apps.superwerewolves.ninja/api/health` | `https://agents.apps.superwerewolves.ninja` | `/api/health`, `/api/tasks`, `/api/metrics`, `/api/agents`, `/` |
-| `food-automation` | `deploy.yaml` | `http://food.baryonyx-walleye.ts.net/health` | `http://food.baryonyx-walleye.ts.net` | `/health` |
+| Repo | Deploy workflow | Dev health URL | Dev base URL | Smoke endpoints | Dev chart name | Dev namespace | Dev chart version pattern |
+|------|----------------|----------------|--------------|-----------------|----------------|---------------|--------------------------|
+| `multi-agent-coordinator` | `deploy.yml` | `https://agents.apps.superwerewolves.ninja/api/health` | `https://agents.apps.superwerewolves.ninja` | `/api/health`, `/api/tasks`, `/api/metrics`, `/api/agents`, `/` | `multi-agent-coordinator-dev` | `multi-agent-coordinator-dev` | `0.1.0-dev.{run_number}` |
+| `food-automation` | `deploy.yaml` | `https://food-dev.apps.superwerewolves.ninja/api/health` | `https://food-dev.apps.superwerewolves.ninja` | `/api/health` | `food-automation-dev` | `food-automation-dev` | `0.1.0-dev.{run_number}` |
 
 If the repo is **not in this table**, stop and tell the user:
 > Repo `{owner}/{repo}` does not have a dev deploy configuration. Add it to the qa-pr skill's deploy config table.
 
 Store the resolved config for use in later steps.
 
-## Step 4: Trigger dev deployment
+## Step 3.5: Ensure kubeconfig
+
+A read-only kubeconfig is needed to query the k3s dev cluster. Check if one exists and is usable:
+
+1. Check if `~/.kube/qa-readonly-kubeconfig` exists and works:
+   ```bash
+   kubectl --kubeconfig=$HOME/.kube/qa-readonly-kubeconfig get nodes --request-timeout=5s 2>&1
+   ```
+2. If it succeeds (exit code 0), the kubeconfig is valid — proceed to Step 3.6.
+3. If it fails or the file doesn't exist:
+   a. Trigger the `generate-kubeconfig.yml` workflow in `super-werewolves/homelab-setup`:
+      ```
+      mcp__gitea__actions_run_write
+        action: dispatch_workflow
+        owner: super-werewolves
+        repo: homelab-setup
+        workflow: generate-kubeconfig.yml
+        ref: main
+      ```
+   b. Wait 10 seconds, then poll for the workflow run (same pattern as Step 5 — look for the most recent `workflow_dispatch` run, poll every 15 seconds for up to 5 minutes)
+   c. Once the run succeeds, download the kubeconfig artifact:
+      ```bash
+      # List artifacts for the run
+      curl -sf -H "Authorization: token $(cat ~/.gitea-token 2>/dev/null || echo $GITEA_TOKEN)" \
+        "https://git.home.superwerewolves.ninja/api/v1/repos/super-werewolves/homelab-setup/actions/runs/{run_id}/artifacts" | jq .
+
+      # Download the artifact file
+      curl -sf -H "Authorization: token $(cat ~/.gitea-token 2>/dev/null || echo $GITEA_TOKEN)" \
+        "https://git.home.superwerewolves.ninja/api/v1/repos/super-werewolves/homelab-setup/actions/artifacts/{artifact_id}" \
+        -o /tmp/kubeconfig-artifact.zip
+
+      # Extract and install
+      mkdir -p ~/.kube
+      unzip -o /tmp/kubeconfig-artifact.zip -d /tmp/kubeconfig-extract
+      cp /tmp/kubeconfig-extract/qa-readonly-kubeconfig ~/.kube/qa-readonly-kubeconfig
+      chmod 600 ~/.kube/qa-readonly-kubeconfig
+      ```
+   d. Verify the new kubeconfig works with the same `kubectl get nodes` test
+   e. If it still fails, warn the user but continue — Steps 3.6 and 3.7 will be skipped and the full deploy path will be used
+
+## Step 3.6: Check if chart already exists for this SHA
+
+Check whether a deploy workflow has already built a chart for the PR's head SHA:
+
+1. Use `mcp__gitea__actions_run_read` with `list_runs` to list workflow runs for the repo, filtering to the head branch
+2. Look for a run with ALL of:
+   - `head_sha` matching the PR's head SHA
+   - `event: "workflow_dispatch"`
+   - `conclusion: "success"`
+   - `status: "completed"` (not waiting/running)
+3. If a matching run is found:
+   - Extract `run_number` from the run
+   - Compute the chart version using the pattern from deploy config: e.g., `0.1.0-dev.{run_number}`
+   - Record: `chart_exists = true`, `chart_version`, `existing_run_number`, `existing_run_id`
+4. If no matching run is found:
+   - Record: `chart_exists = false`
+
+## Step 3.7: Check what's currently deployed on k3s dev
+
+If kubeconfig is available (Step 3.5 succeeded), query the Flux HelmRelease to see what version is currently deployed:
+
+```bash
+kubectl --kubeconfig=$HOME/.kube/qa-readonly-kubeconfig \
+  get helmrelease {dev_chart_name} -n {dev_namespace} \
+  -o jsonpath='{.status.lastAppliedRevision}' 2>/dev/null
+```
+
+This returns the currently deployed chart version (e.g., `0.1.0-dev.202`).
+
+- If the command succeeds, record `deployed_version` (the output)
+- If it fails (HelmRelease not found, kubeconfig issue), record `deployed_version = unknown`
+
+## Step 4: Deploy decision
+
+Based on Steps 3.6 and 3.7, decide what to do:
+
+| Chart exists? (3.6) | Matches deployed? (3.7) | Action |
+|---|---|---|
+| No | N/A | **Full deploy** — trigger workflow, wait for build, wait for Flux (Steps 4a + 4b + 4c) |
+| Yes | Yes (same version) | **Skip entirely** — go straight to smoke tests (Step 7). Post comment: "Chart `{dev_chart_name}:{chart_version}` already built and deployed — skipping to smoke tests." |
+| Yes | No (different version) | **Skip build, wait for Flux** — skip workflow trigger, go to Step 4c only. Post comment: "Chart `{dev_chart_name}:{chart_version}` already exists from run #{existing_run_number}. Currently deployed: `{deployed_version}` — waiting for Flux to reconcile." |
+
+If kubeconfig was unavailable (Step 3.5 failed) and chart exists, treat as "Yes / No" (skip build, wait for Flux) since we can't confirm what's deployed.
+
+### Step 4a: Trigger dev deployment (only if chart does NOT exist)
 
 Dispatch the deploy workflow targeting the **dev** environment from the PR's **head branch**:
 
@@ -66,7 +150,7 @@ After dispatching, post a brief PR comment:
 🔄 **QA deploy started** — deploying `{head_branch}` ({head_sha_short}) to dev environment.
 ```
 
-## Step 5: Wait for build + deploy workflow to complete
+### Step 4b: Wait for build + deploy workflow to complete (only if chart does NOT exist)
 
 1. Wait 15 seconds for the action to register
 2. Call `mcp__gitea__list_repo_action_runs` and look for a run:
@@ -75,7 +159,7 @@ After dispatching, post a brief PR comment:
    - Created after the dispatch timestamp
 3. If no run found yet, poll every 30 seconds for up to 5 minutes
 4. Once the run is found, poll its status every 30 seconds for up to 10 minutes:
-   - `success` — proceed to Step 6
+   - `success` — proceed to Step 4c
    - `failure` — jump to Step 8 (report failure)
    - Still running — keep polling
 
@@ -83,9 +167,9 @@ If no run is found after 5 minutes, jump to Step 8 with error: "Deploy workflow 
 
 Record the run ID and conclusion for the report.
 
-## Step 6: Wait for Flux rollout
+### Step 4c: Wait for Flux rollout (skip if chart already deployed)
 
-Flux CD picks up new Helm chart versions from the OCI registry. After the deploy workflow pushes a new chart, Flux needs time to detect and apply it.
+Flux CD picks up new Helm chart versions from the OCI registry. After a chart is pushed, Flux needs time to detect and apply it.
 
 1. Wait 30 seconds for the chart to propagate to the registry
 2. Poll the dev health URL (from Step 3) every 30 seconds for up to 15 minutes:
@@ -135,7 +219,7 @@ Run ALL smoke endpoints from the deploy config table (Step 3) against `{dev_base
 
 | Test | Endpoint | Pass criteria |
 |------|----------|---------------|
-| Health check | `GET /health` | HTTP 200, response contains `"status"` |
+| Health check | `GET /api/health` | HTTP 200, response contains `"status"` |
 
 ### Collecting results
 
@@ -158,7 +242,7 @@ Compose and post a PR comment using `mcp__gitea__create_issue_comment` with the 
 ✅ **QA Passed** — dev deployment verified
 
 **Branch:** `{head_branch}` ({head_sha_short})
-**Deploy:** Workflow run #{run_number} — {conclusion}
+**Deploy:** {deploy_summary}
 **Environment:** dev
 
 | Test | Endpoint | Status | Result |
@@ -170,13 +254,20 @@ Compose and post a PR comment using `mcp__gitea__create_issue_comment` with the 
 All {N} smoke tests passed. Ready for merge.
 ```
 
+### Deploy summary line
+
+The `{deploy_summary}` should reflect what happened:
+- Full deploy: `Workflow run #{run_number} — {conclusion}`
+- Chart existed, Flux waited: `Skipped build (chart from run #{existing_run_number}), waited for Flux rollout`
+- Chart already deployed: `Skipped deploy (chart 0.1.0-dev.{run_number} already deployed)`
+
 ### If ANY tests failed
 
 ```markdown
 ❌ **QA Failed** — dev deployment has issues
 
 **Branch:** `{head_branch}` ({head_sha_short})
-**Deploy:** Workflow run #{run_number} — {conclusion}
+**Deploy:** {deploy_summary}
 **Environment:** dev
 
 | Test | Endpoint | Status | Result |
