@@ -133,7 +133,7 @@ AskUserQuestion:
 
 3. Set `chmod 600 ~/.mcp.json` to protect the token.
 
-4. **Enable `gitea` in the project config.** Claude Code requires MCP servers from `~/.mcp.json` to be explicitly enabled per project in `~/.claude.json`. Read `~/.claude.json`, find the `projects` entry for the current working directory (e.g., `"/home/claude-user"`), and add `"gitea"` to the `enabledMcpjsonServers` array if not already present. Write the file back.
+4. **Enable `gitea` in the project config.** Claude Code requires MCP servers from `~/.mcp.json` to be explicitly enabled per project in `~/.claude.json`. Use the same backup-validate-move procedure from Step 2d: back up `~/.claude.json` first, then read it, find the `projects` entry matching your working directory, and add `"gitea"` to the `enabledMcpjsonServers` array if not already present. Validate the JSON before writing it back.
 
    Example — the relevant section should look like:
    ```json
@@ -207,7 +207,7 @@ grep -q '"mcp-agent-mail"' ~/.mcp.json 2>/dev/null || grep -q '"mcp-agent-mail"'
 
    If `~/.mcp.json` already exists, use the same backup-validate-move procedure from Step 2d to merge the key safely. Do not overwrite other entries.
 
-4. **Enable `mcp-agent-mail` in the project config.** Same as the Gitea MCP step — read `~/.claude.json`, find the `projects` entry for the current working directory, and add `"mcp-agent-mail"` to the `enabledMcpjsonServers` array if not already present.
+4. **Enable `mcp-agent-mail` in the project config.** Same as the Gitea MCP step — use the backup-validate-move procedure, then add `"mcp-agent-mail"` to the `enabledMcpjsonServers` array if not already present.
 
 The Agent Mail server runs locally — no tokens or external auth needed for single-machine setups.
 
