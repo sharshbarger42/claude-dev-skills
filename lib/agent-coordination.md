@@ -6,6 +6,16 @@ Register, query, and deregister active work across agents. Uses Gitea labels as 
 - `!cat $HOME/.claude/development-skills/lib/agent-identity.md`
 - `!cat $HOME/.claude/development-skills/lib/discord-notify.md`
 
+## Multi-Agent Gate
+
+Before using any Agent Mail or Discord features in this lib, check if multi-agent mode is enabled:
+
+```bash
+grep -q 'multi_agent: true' ~/.claude/env-config.yaml 2>/dev/null
+```
+
+If `multi_agent` is **not true**, skip all Agent Mail and Discord steps in this lib. Only Gitea label management (the authoritative signal) runs regardless of this flag.
+
 ## Register Active Work
 
 Call this when an agent starts working on an issue or PR. Three actions, all best-effort:
