@@ -12,6 +12,17 @@ Address all review comments on a Gitea pull request: fetch comments, classify by
 - Owner/repo: `super-werewolves/food-automation#34`
 - Full URL: `https://git.home.superwerewolves.ninja/super-werewolves/food-automation/pulls/34`
 
+## Session persistence
+
+!`cat $HOME/.claude/development-skills/lib/session-state.md`
+
+At skill start, call **Session Read** to check for prior context. Then call **Session Write** after these milestones:
+- After Step 2 (PR metadata fetched — record PR title, branches)
+- After Step 4 (comments classified — record comment counts and planned actions)
+- After Step 6 (user confirmed plan — record what will be fixed vs deferred)
+- After Step 9 (committed and pushed — record commit SHA, files changed)
+At the end of Step 11 (report), call **Session Clear**.
+
 ## Step 1: Parse the PR reference
 
 Extract `owner`, `repo`, and PR `index` from the argument.

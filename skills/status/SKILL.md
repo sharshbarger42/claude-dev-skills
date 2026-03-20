@@ -12,16 +12,16 @@ Piece together the user's current state from SESSION.md files, git history, Gite
 
 ## Step 1: Find SESSION.md Files
 
-Search for SESSION.md files across repos:
+Search for session files across repos:
 
 ```bash
-find ~/gitea-repos -maxdepth 3 -name "SESSION.md" -type f 2>/dev/null
-find ~/repos -maxdepth 3 -name "SESSION.md" -type f 2>/dev/null
+find ~/gitea-repos -maxdepth 2 -name "SESSION-*.md" -type f 2>/dev/null
+find ~/repos -maxdepth 2 -name "SESSION-*.md" -type f 2>/dev/null
 ```
 
-Also check for a SESSION.md in the current directory.
+Also check for a SESSION.md (legacy) or SESSION-*.md in the current directory.
 
-For each SESSION.md found:
+For each session file found:
 1. Read it — it contains active task context (issue, goal, plan, work done)
 2. Note which repo it's in
 3. Check the git status and recent activity:
@@ -35,7 +35,7 @@ For each SESSION.md found:
 
 ## Step 2: Check Recent Git Activity
 
-For repos under `~/gitea-repos/` that do NOT have a SESSION.md but have today's commits:
+For repos under `~/gitea-repos/` that do NOT have a session file but have today's commits:
 
 ```bash
 for repo in ~/gitea-repos/*/; do
@@ -47,7 +47,7 @@ for repo in ~/gitea-repos/*/; do
 done
 ```
 
-This catches work in repos where SESSION.md was already cleaned up.
+This catches work in repos where the session file was already cleared.
 
 ---
 
@@ -73,7 +73,7 @@ Synthesize everything into a clear status report:
 ## Status — [today's date]
 
 ### Active Sessions
-[For each SESSION.md found:]
+[For each session file found:]
 - **[repo]** — [issue/goal from SESSION.md]
   - Branch: [current branch]
   - Status: [uncommitted changes / clean / N commits today]
@@ -96,7 +96,7 @@ Synthesize everything into a clear status report:
 
 Based on the picture, suggest 3-5 concrete next actions. Prioritize by:
 
-1. **Resume interrupted work** — if there's a SESSION.md with uncommitted changes, suggest resuming that task first
+1. **Resume interrupted work** — if there's a session file with uncommitted changes, suggest resuming that task first
 2. **Commit and push** — if a repo has uncommitted changes from today's work, suggest committing
 3. **Open PRs needing attention** — if Gitea MCP is available, check for open PRs by the user that need review or have comments
 4. **Pick next task** — if no active session, suggest running `/do-the-thing` or `/do-issue` to pick up work
@@ -120,5 +120,5 @@ Present as a numbered list:
 - **Read-only.** This skill only reads files and git state. It never modifies files, commits, pushes, or posts to external services.
 - **Don't print secrets.** If any files contain credentials, do not include them in output.
 - **Be concise.** The user wants a quick catch-up, not a novel. Use bullet points and short descriptions.
-- **Handle missing data gracefully.** If no SESSION.md exists and no git activity today, say so and suggest starting fresh.
+- **Handle missing data gracefully.** If no session files exist and no git activity today, say so and suggest starting fresh.
 - **Respect time boundaries.** Only report on today's activity unless a SESSION.md has older context that's still relevant (check file modification time).

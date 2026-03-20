@@ -13,6 +13,18 @@ Full development loop in one command: triage open issues, pick one, implement it
 
 If no argument is provided, infer the repo from context (see Step 1).
 
+## Session persistence
+
+!`cat $HOME/.claude/development-skills/lib/session-state.md`
+
+At skill start, call **Session Read** to check for prior context. Then call **Session Write** after these milestones:
+- After Step 1 (repo resolved — record target repo)
+- After Step 3 (issue chosen — record which issue and why)
+- After Step 4 (do-issue complete — record PR number, branch, review results)
+- After Step 5 (fix-pr complete — record what was fixed)
+- After Step 6 (merge complete — record merge result, deploy status)
+At the end of Step 7 (report), call **Session Clear**.
+
 ## Step 1: Parse or infer the repo
 
 ### If an argument was provided

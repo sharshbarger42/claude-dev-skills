@@ -28,6 +28,44 @@ Read `~/.claude/projects/-home-selina/memory/MEMORY.md` — this
 contains lessons from previous sessions, gotchas, and the
 post-compaction checklist.
 
+### Step 2b: Check for active sessions
+
+Search for session files across repos:
+
+```bash
+find ~/gitea-repos -maxdepth 2 -name "SESSION-*.md" -type f 2>/dev/null
+```
+
+If session files are found:
+
+1. Read each one
+2. Derive your own agent ID: `AGENT_ID="$(echo "${CLAUDE_SESSION_ID:-unknown}" | cut -c1-8)"`
+3. If **multiple session files** exist, present a summary of each and ask which one is yours:
+   ```
+   Found active sessions:
+
+   1. **{repo}/SESSION-{id1}.md** — {skill}: #{index} {title} (step: {step}, updated: {timestamp})
+   2. **{repo}/SESSION-{id2}.md** — {skill}: #{index} {title} (step: {step}, updated: {timestamp})
+   ```
+   Use `AskUserQuestion` with each session as an option plus a "None — starting fresh" option.
+4. If **one session file** exists, present it and ask if the user wants to resume:
+   ```
+   Found a previous session:
+   - **Skill:** {skill}
+   - **Repo:** {repo}
+   - **Issue/PR:** #{index} — {title}
+   - **Last step:** {step}
+   - **Updated:** {timestamp}
+
+   {summary from "What we're doing" section}
+   ```
+   Use `AskUserQuestion`: **Resume this work** or **Start fresh** (clears the session file).
+5. If **no session files** found, skip silently.
+
+If the user picks a session, include its full content in your context so you can reference decisions and progress throughout the conversation.
+
+If the user says "start fresh", delete the session file(s) that were presented.
+
 ### Step 3: Register rules and acknowledge
 
 In your response, explicitly list:

@@ -13,6 +13,17 @@ Find PRs that are ready to merge, verify all reviews are addressed and CI passes
 
 If no argument is provided, ask which repos to scan.
 
+## Session persistence
+
+!`cat $HOME/.claude/development-skills/lib/session-state.md`
+
+At skill start, call **Session Read** to check for prior context. Then call **Session Write** after these milestones:
+- After Step 2 (PRs listed — record which PRs found and their status)
+- After Step 5 (user confirmed which to merge — record selections)
+- After Step 6 (merges complete — record which merged, merge styles)
+- After Step 9 (health checks done — record deploy/health results)
+At the end of Step 10 (report), call **Session Clear**.
+
 ## Step 1: Parse optional repo argument
 
 If an argument was provided, extract `owner` and `repo`.
