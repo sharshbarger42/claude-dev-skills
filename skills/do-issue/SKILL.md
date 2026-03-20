@@ -33,6 +33,8 @@ Then check if another agent is already working on this issue:
 
 !`cat $HOME/.claude/development-skills/lib/agent-coordination.md`
 
+!`cat $HOME/.claude/development-skills/lib/discord-notify.md`
+
 Use the **Query Active Work** procedure from `agent-coordination.md`, filtered to this specific issue.
 
 3. If a conflict is found (label set AND Agent Mail shows another agent):
