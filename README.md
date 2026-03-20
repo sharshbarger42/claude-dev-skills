@@ -16,23 +16,16 @@ Portable Claude Code skills plugin for dev workflow automation.
 
 Skills are invoked as `/development-skills:do-issue`, `/development-skills:review-pr`, etc.
 
-### Symlink fallback
+### Manual setup
 
 ```bash
-git clone ssh://gitea@192.168.0.174:2222/super-werewolves/development-skills.git ~/gitea-repos/development-skills
-cd ~/gitea-repos/development-skills
-./install.sh
+git clone ssh://gitea@git.baryonyx-walleye.ts.net:2222/super-werewolves/development-skills.git ~/gitea-repos/development-skills
 ```
 
-### Selective install
+Then inside Claude Code:
 
-```bash
-./install.sh all        # Install everything (default)
-./install.sh workflow   # Workflow skills only (do-issue, review-pr, etc.)
-./install.sh planning   # Planning skills only (analyze-idea, plan-project, etc.)
-```
-
-This symlinks each skill directory into `~/.claude/skills/`. A `git pull` instantly updates all skills — no re-install needed.
+1. Register the skills marketplace: `/plugin marketplace add ~/gitea-repos/development-skills`
+2. Run `/setup-env` to configure everything (Gitea MCP, SSH keys, plugins, skill symlinks, prerequisites)
 
 ## Structure
 
@@ -41,7 +34,7 @@ development-skills/
 ├── .claude-plugin/
 │   └── plugin.json         # Plugin metadata (name, version, description)
 ├── marketplace.json        # Marketplace catalog for plugin discovery
-├── install.sh              # Symlink installer + prerequisite checker (fallback)
+├── install.sh              # Deprecated — points to /setup-env
 ├── config/
 │   ├── repos.md            # Centralized repo shorthand table
 │   └── infrastructure.md   # IPs, domains, service URLs
@@ -82,7 +75,7 @@ development-skills/
 
 ## Skills
 
-### Workflow (`./install.sh workflow`)
+### Workflow
 
 | Skill | Description |
 |-------|-------------|
@@ -99,7 +92,7 @@ development-skills/
 | `/status` | Catch-up summary — active sessions, git activity, suggested next actions |
 | `/setup-env` | Interactive environment setup — Gitea, Discord, AGENTS.md, plugins, tools |
 
-### Planning (`./install.sh planning`)
+### Planning
 
 | Skill | Description |
 |-------|-------------|
