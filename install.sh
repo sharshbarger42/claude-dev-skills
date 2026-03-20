@@ -78,6 +78,13 @@ for srv in gitea tandoor obsidian grocy google kroger ersatztv; do
 done
 
 echo ""
+echo "=== Plugins ==="
+echo "  Register the marketplace, then install plugins:"
+echo "    claude plugin marketplace add $REPO_DIR"
+echo "    claude plugin install sound-notifications@super-werewolves-skills --scope user"
+echo "    claude plugin install productivity-hooks@super-werewolves-skills --scope user"
+
+echo ""
 echo "=== Optional: Multi-Agent Coordination ==="
 [[ -f "$HOME/.config/development-skills/discord-webhook" ]] && echo "  Discord webhook: OK" || echo "  Discord webhook: not configured (create ~/.config/development-skills/discord-webhook)"
 if grep -q "\"mcp-agent-mail\"" "$HOME/.mcp.json" 2>/dev/null || grep -q "\"mcp-agent-mail\"" "$HOME/.claude.json" 2>/dev/null; then

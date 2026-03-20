@@ -1,0 +1,6 @@
+{
+  "name": "sound-notifications",
+  "version": "1.0.0",
+  "description": "Plays system sounds when Claude needs input or finishes a task",
+  "hooks": "../hooks/hooks.json"
+}
