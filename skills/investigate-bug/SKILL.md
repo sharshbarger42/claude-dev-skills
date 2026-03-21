@@ -45,6 +45,21 @@ Determine the input type:
 
 Store the symptom description for use in later steps.
 
+### Symptom inventory (multi-symptom input)
+
+When the input contains **multiple distinct symptoms** (bullet lists, numbered items, or clearly separate issues):
+
+1. **Extract and number every symptom** — create a numbered inventory list. Each distinct symptom the user reported gets its own entry, no matter how minor it seems. Preserve the user's **exact wording** as a direct quote for each symptom.
+2. **Track each symptom through the investigation.** Every symptom must end in one of these dispositions:
+   - **Filed** — a Gitea issue was created for it
+   - **Grouped** — folded into another symptom's issue (note which one)
+   - **Not reproducible** — investigated but could not confirm
+   - **Deferred** — user chose to skip it
+3. **Never silently discard a symptom.** If investigation suggests a reported symptom is not a code bug (e.g., infrastructure issue, configuration problem, expected behavior, or user error), you must still present it to the user in Step 5 with your reasoning and let them decide whether to file an issue anyway.
+4. **Present the full inventory in Step 5** (root cause determination) and again in **Step 8** (report). The user should see every symptom they reported and what happened to it.
+
+If any symptom would be dropped or grouped, the user must explicitly confirm. Use `AskUserQuestion` to confirm any symptom you plan to NOT file as a separate issue — present your reasoning and let the user override.
+
 ## Step 2: Ensure kubeconfig
 
 A read-only kubeconfig is needed to query the K3s cluster. Check if one exists and is usable:
@@ -170,9 +185,28 @@ Synthesize evidence into a diagnosis:
 3. **Impact** — what's broken for users right now
 4. **Confidence** — high/medium/low based on evidence strength
 
-Present the diagnosis to the user for confirmation before creating issues. Use `AskUserQuestion` with options:
+### Symptom accounting
+
+Before presenting the diagnosis, review the symptom inventory from Step 1. For **every** reported symptom, state:
+- Which root cause it maps to (if any)
+- Whether it will get its own issue, be grouped into another issue, or not be filed
+- If not filed: **why** (with evidence), and flag it for user confirmation
+
+Present the full accounting table:
+
+```
+| # | Symptom (user's words) | Disposition | Rationale |
+|---|------------------------|-------------|-----------|
+| 1 | "exact quote from user" | Filed as issue | Root cause identified |
+| 2 | "exact quote from user" | Grouped with #1 | Same root cause |
+| 3 | "exact quote from user" | Needs confirmation | Appears to be config issue, not code bug |
+```
+
+**Any symptom marked "Needs confirmation" must be explicitly confirmed by the user** before proceeding. Do not assume a symptom is not a real bug — the user reported it for a reason. Even if you believe it's a configuration issue, infrastructure problem, or expected behavior, present your reasoning and ask.
+
+Present the diagnosis and accounting to the user for confirmation. Use `AskUserQuestion` with options:
 - **Confirmed — create issues** — proceed to Step 6
-- **Needs more investigation** — go back to Step 4 with user guidance
+- **Needs more investigation** — go back to Step 4 with user guidance (user can specify which symptoms need more work)
 - **Wrong direction** — user provides corrected hypothesis
 - **Abandon — do not file issues** — investigation inconclusive, stop without creating issues
 
@@ -204,6 +238,13 @@ For each affected repo, create a well-structured bug issue.
 ```markdown
 ## Symptom
 {What the user reported or what was observed}
+
+## Reported by human
+{Direct quotes from the user's bug report that this issue addresses. Use blockquotes to preserve the user's exact words. Each quote should be the verbatim text from the human's input that led to this issue being filed.}
+
+> "{exact quote from user's report — symptom 1}"
+
+> "{exact quote from user's report — symptom 2, if multiple symptoms map to this issue}"
 
 ## Root Cause
 {What's actually broken and why — include evidence}
@@ -286,5 +327,6 @@ This is best-effort — skip silently if webhook is not configured.
 Tell the user:
 1. **Diagnosis** — root cause summary
 2. **Verification results** — what was confirmed, with verdicts
-3. **Issues created** — list with repo, issue number, title, and link
-4. **Suggested next steps** — which issue to fix first, dependencies between them
+3. **Symptom inventory** — the full accounting table from Step 5 with final dispositions for every reported symptom. Every symptom the user reported must appear here with a clear outcome (filed, grouped, deferred, or not reproducible). If any symptoms were not filed, restate why.
+4. **Issues created** — list with repo, issue number, title, and link
+5. **Suggested next steps** — which issue to fix first, dependencies between them
