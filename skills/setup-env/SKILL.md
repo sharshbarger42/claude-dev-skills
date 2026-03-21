@@ -211,7 +211,82 @@ grep -q '"mcp-agent-mail"' ~/.mcp.json 2>/dev/null || grep -q '"mcp-agent-mail"'
 
 The Agent Mail server runs locally — no tokens or external auth needed for single-machine setups.
 
-### 2h. Dev Types (optional)
+### 2h. Productivity Docs (optional)
+
+The productivity-hooks plugin and skills rely on two config documents that are injected into every prompt:
+
+- **`repos.md`** — shorthand table mapping repo names to owner, local paths, and descriptions. Used by `resolve-repo.md` for all skill input parsing.
+- **`infrastructure.md`** — IPs, domains, service URLs for the homelab environment. Used by `/investigate-bug`, `/qa-pr`, and injected on every prompt.
+
+These live at `~/.config/development-skills/` (preferred) or fall back to `~/.claude/development-skills/config/`.
+
+```
+AskUserQuestion:
+  question: "Set up productivity docs? (repos.md project map and infrastructure.md reference — used by skills and injected on every prompt)"
+  options: ["Yes, set them up", "Skip"]
+```
+
+**If yes:**
+
+First, ensure the config directory exists:
+
+```bash
+mkdir -p ~/.config/development-skills/
+```
+
+**Re-apply mode:** If running in re-apply mode (Step 0), check if `repos.md` and `infrastructure.md` already exist and are non-empty at `~/.config/development-skills/`. If both exist, skip with a note: "Productivity docs already configured (repos.md + infrastructure.md)." and move on. Only re-prompt if one or both are missing.
+
+#### repos.md
+
+1. Check if `~/.config/development-skills/repos.md` already exists. If so, show it and ask if the user wants to keep or regenerate.
+
+2. **Check if Gitea MCP is available** (was it configured in Step 2d?). If yes, auto-generate from Gitea. If no, fall back to manual entry.
+
+3. **If Gitea MCP is available:** list all repos the user has access to via `mcp__gitea__list_my_repos`. Build a shorthand table:
+
+   ```markdown
+   # Project Map
+
+   | Shorthand | Owner | Repo | Local path | Description |
+   |-----------|-------|------|------------|-------------|
+   | `homelab-setup` | `super-werewolves` | `homelab-setup` | `~/gitea-repos/homelab-setup` | Infrastructure as code |
+   | `food-automation` | `super-werewolves` | `food-automation` | `~/gitea-repos/food-automation` | Grocy voice & photo assistant |
+   | ... | ... | ... | ... | ... |
+   ```
+
+4. **If Gitea MCP is NOT available:** ask the user to provide repo names and owners manually via AskUserQuestion. Build the table from their input.
+
+5. For each repo, infer the local path as `~/gitea-repos/{repo_name}`. If the directory exists, use the actual path. If not, use the default.
+
+6. Present the generated table and ask the user to confirm or edit before saving.
+
+7. Write to `~/.config/development-skills/repos.md` only. Do NOT write to `~/.claude/development-skills/config/` — that path is a symlink into the git-tracked repo and should not contain generated per-user config. The `on-prompt.sh` hook and `resolve-repo.md` both check `~/.config/development-skills/` first.
+
+#### infrastructure.md
+
+1. Check if `~/.config/development-skills/infrastructure.md` already exists. If so, show a summary and ask if the user wants to keep or regenerate.
+
+2. If generating or missing: check if a template exists at `~/development-skills/config/infrastructure.md`. If so, copy it to `~/.config/development-skills/infrastructure.md`.
+
+3. If no template exists, create a minimal skeleton using values already collected in Step 2b:
+
+   ```markdown
+   # Infrastructure Reference
+
+   ## Network
+
+   | Name | Value |
+   |------|-------|
+   | Gitea Web URL | `{gitea_url}` |
+
+   ## Services
+
+   (Add your services here)
+   ```
+
+4. Tell the user they can edit `~/.config/development-skills/infrastructure.md` to add services, IPs, etc.
+
+### 2i. Dev Types (optional)
 
 Use AskUserQuestion with multi-select style options:
 
@@ -223,7 +298,7 @@ AskUserQuestion:
 
 If the user needs multiple (but not all), ask again after each selection until they say done, or use a follow-up question.
 
-### 2i. Batch Confirmation
+### 2j. Batch Confirmation
 
 Present all collected values, then use AskUserQuestion:
 
@@ -237,6 +312,7 @@ AskUserQuestion:
     - Multi-agent: {enabled/disabled}
     - Agent Mail MCP: {configured/skipped/n/a}
     - Discord: {configured/not configured/n/a}
+    - Productivity docs: {repos.md + infrastructure.md / skipped}
     - Dev types: {types or "none"}
   options: ["Confirm", "Edit a setting"]
 ```
@@ -404,6 +480,9 @@ Prerequisites:
   Multi-agent:               {enabled/disabled}
   Agent Mail MCP:            {configured/not configured/n/a (single-agent)}
   Discord webhook:           {configured/not configured/n/a (single-agent)}
+  Productivity docs:
+    repos.md:                {configured/missing}
+    infrastructure.md:       {configured/missing}
 
 Plugins:
   sound-notifications:       {installed/not installed}
@@ -441,6 +520,7 @@ Skills and libs read `multi_agent` to decide whether to use Agent Mail and agent
 - Agent Mail MCP: {configured / skipped / n/a}
 - Discord: {configured / skipped / n/a}
 - AGENTS.md: {created / already existed}
+- Productivity docs: {repos.md + infrastructure.md configured / skipped}
 
 ### Installed
 - {tools installed or skipped}
