@@ -11,6 +11,15 @@ disable-model-invocation: false
 
 ## Instructions
 
+### Step 0: Check for existing draft
+
+- Read WEEK.md and look for a "Grocery List" section (any heading containing "Grocery")
+- If a draft list exists, present it to the user and ask:
+  > "There's already a draft grocery list in WEEK.md. Want me to refine it with current Grocy stock, or start fresh?"
+  - **Refine:** Skip Step 1 (recipe ingredients are already known). Go straight to Step 2 to cross-reference the draft against current inventory, then update the list.
+  - **Start fresh:** Wipe the draft and run all steps from scratch.
+- If no draft exists, proceed normally from Step 1.
+
 ### Step 1: Get recipe ingredients for the planned meals
 
 - Read the meal plan from WEEK.md (or from Tandoor meal plans for the target week)
