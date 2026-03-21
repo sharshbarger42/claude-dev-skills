@@ -219,7 +219,22 @@ For each affected repo, create a well-structured bug issue.
 
 ## Impact
 {What's broken for users, severity}
+
+## Test Criteria
+{A checklist of testable conditions that must pass before this bug can be considered fixed. Each criterion should be specific and verifiable by automated QA or a human tester. The `/qa-pr` skill will use this list to validate the fix.}
+
+- [ ] {Criterion 1: e.g., "GET /api/health returns HTTP 200 with status: healthy"}
+- [ ] {Criterion 2: e.g., "Dashboard loads within 5 seconds without JS errors"}
+- [ ] ...
+- [ ] Human verification: {owner confirms the fix works in their environment}
 ```
+
+**IMPORTANT:** The `Test Criteria` section is mandatory for all bug issues. Each criterion must be:
+- **Specific** — a concrete check, not "it works"
+- **Verifiable** — can be tested with a command, HTTP request, or UI interaction
+- **Ordered** — automated checks first, human verification always last
+
+The final criterion must always be: `Human verification: {brief description of what the human should confirm}`. This ensures no bug is auto-closed without a human signoff.
 
 ### Labeling procedure
 

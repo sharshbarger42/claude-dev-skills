@@ -88,6 +88,35 @@ If the issue has a `decision-needed` label:
    - **Skip this issue** — stop and suggest picking a different issue
 5. If the user resolves the decision, remove the `decision-needed` label from the issue before proceeding to Step 3.
 
+## Step 2c: Check for existing work and QA feedback
+
+Check whether this issue already has implementation work and/or QA feedback:
+
+1. **Check for existing branches:** Run `git ls-remote origin "refs/heads/feature/{index}-*"` to see if a feature branch already exists for this issue.
+2. **Fetch issue comments:** Use `mcp__gitea__get_issue_comments` to read all comments on the issue.
+3. **Detect QA failure comments:** Look for comments that match the QA failure pattern — comments containing "QA Failed" or "Test Criteria Failures" posted by an agent or the QA skill. These indicate a previous fix attempt was rejected by QA.
+
+**If a QA failure comment is found:**
+
+This means a previous fix was attempted but QA found problems. Enter **fix mode**:
+
+- Extract the specific test failures from the QA comment (look for the failures table or list)
+- Set `FIX_MODE = true` — this changes the flow:
+  - **Skip Step 4** (approach confirmation) — the approach was already confirmed; now you're fixing specific test failures
+  - In **Step 5**, check out the existing feature branch instead of creating a new one. If a PR already exists, work on the same branch.
+  - In **Step 6**, focus specifically on fixing the QA failures identified in the comment
+  - After **Step 7** (commit and push), post a comment on the issue: `"Fixed QA failures — ready to test again. See commit {sha_short}."`
+  - Swap the issue label from `status: in-progress` to `status: ready-to-test`
+  - **Skip Steps 8-11** (PR already exists, review already done) — jump to Step 12 (report)
+
+**If an existing branch is found but no QA failure:**
+
+Ask the user whether to:
+- **Continue on the existing branch** — check it out and resume where it left off
+- **Start fresh** — delete the branch and start over
+
+**If neither:** Proceed normally to Step 3.
+
 ## Step 3: Read repo AGENTS.md
 
 Use `mcp__gitea__get_file_contents` to fetch `AGENTS.md` from the repo's default branch. Get the default branch name from the issue metadata (`repository.default_branch`) — do NOT hardcode `master` or `main`.
@@ -115,7 +144,7 @@ Use worktree isolation so the main working tree stays clean:
 4. Verify you're in the worktree with `git branch --show-current` and `pwd`
 5. Create the feature branch: `git checkout -b feature/{index}-{short-slug}`
    - `short-slug`: lowercase, hyphenated, 3-5 words from the issue title (e.g., `add-tandoor-recipe-integration`)
-6. **Update status label:** Add `status: in-progress` to the issue and remove `status: backlog` if present.
+6. **Update status label:** Add `status: in-progress` to the issue and remove `status: backlog` or `status: ready-to-test` if present.
 
 **In-place fallback** (only if EnterWorktree fails):
 
@@ -165,6 +194,8 @@ Use `mcp__gitea__pull_request_write` with method `create`:
 **IMPORTANT — PR body formatting:** Pass the `body` parameter as a real multi-line string with actual newlines. Do NOT use `\n` escape sequences — the Gitea MCP tool stores them literally, producing a single-line blob of `\n` characters instead of rendered markdown. Just write the body naturally across multiple lines in the parameter value.
 
 After creating the PR, **update the status label:** replace `status: in-progress` with `status: in-review` on the issue (see status-labels.md above for the swap procedure).
+
+**Fix mode note:** If `FIX_MODE = true`, the PR already exists — skip PR creation entirely. Instead, swap `status: in-progress` to `status: ready-to-test` and jump to Step 12.
 
 **Discord notification:** Post a "PR Created" Discord notification using the purple embed template from `discord-notify.md`. Include the PR number, title, branch, and agent name. Best-effort — skip silently if webhook is not configured.
 

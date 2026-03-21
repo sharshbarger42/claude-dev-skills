@@ -6,6 +6,7 @@ All repos use these `status:` labels to track issue lifecycle:
 |-------|---------|
 | `status: backlog` | Not yet started |
 | `status: in-progress` | Actively being worked on |
+| `status: ready-to-test` | Fix pushed, awaiting QA verification |
 | `status: in-review` | PR open, awaiting review/merge |
 | `status: done` | Completed |
 

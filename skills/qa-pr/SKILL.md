@@ -184,6 +184,21 @@ Flux CD picks up new Helm chart versions from the OCI registry. After a chart is
 
 **Note:** Flux polls every 30 minutes, so this step may take a while. If the health endpoint was already healthy before the deploy (from a previous deployment), the smoke tests in Step 7 are the real validation — the health check here is just a gate to ensure the service is reachable.
 
+## Step 6.5: Fetch issue test criteria
+
+If the PR body contains `Closes #N` or `Fixes #N`, extract the linked issue number and fetch it:
+
+1. Parse the PR body for issue references matching `Closes #(\d+)` or `Fixes #(\d+)` (case-insensitive)
+2. If found, fetch the issue via `mcp__gitea__get_issue_by_index` with the parsed `owner`, `repo`, and issue `index`
+3. Parse the issue body for a `## Test Criteria` section
+4. Extract all checklist items (`- [ ] ...`) from that section — these are the **issue test criteria**
+5. Separate them into:
+   - **Automated criteria** — all items except the last "Human verification" item
+   - **Human verification** — the final item starting with "Human verification:"
+6. Store both lists for use in Step 7
+
+If no linked issue is found, or the issue has no Test Criteria section, proceed with smoke tests only.
+
 ## Step 7: Run smoke tests
 
 Run a series of smoke tests against the dev environment. Each test is a simple HTTP request that validates the endpoint returns a successful response with expected content.
@@ -221,13 +236,26 @@ Run ALL smoke endpoints from the deploy config table (Step 3) against `{dev_base
 |------|----------|---------------|
 | Health check | `GET /api/health` | HTTP 200, response contains `"status"` |
 
+### Issue test criteria (from Step 6.5)
+
+After running smoke tests, run each **automated criterion** from the issue's Test Criteria section. For each criterion:
+
+1. Interpret the criterion as a testable check (e.g., "GET /api/health returns HTTP 200" → `curl` the endpoint and check status)
+2. Execute the check against the dev environment
+3. Record result with same pass/fail structure as smoke tests
+4. Mark the criterion source as `issue` (vs `smoke` for the default tests)
+
+**Human verification criteria are NOT executed** — they are included in the results table as `PENDING` with a note that human signoff is required.
+
 ### Collecting results
 
 Build a results list:
 ```
 [
-  { "name": "Health check", "endpoint": "/api/health", "status": 200, "passed": true, "detail": "" },
-  { "name": "Task list", "endpoint": "/api/tasks", "status": 500, "passed": false, "detail": "Internal server error: database locked" },
+  { "name": "Health check", "source": "smoke", "endpoint": "/api/health", "status": 200, "passed": true, "detail": "" },
+  { "name": "Task list", "source": "smoke", "endpoint": "/api/tasks", "status": 500, "passed": false, "detail": "Internal server error: database locked" },
+  { "name": "Dashboard loads under 5s", "source": "issue", "endpoint": "/", "status": 200, "passed": true, "detail": "Loaded in 1.2s" },
+  { "name": "Human verification", "source": "issue", "endpoint": "-", "status": "-", "passed": "pending", "detail": "Owner confirms fix works" },
   ...
 ]
 ```
@@ -300,10 +328,60 @@ The `{deploy_summary}` should reflect what happened:
 The deploy workflow failed before smoke tests could run. Check the [workflow run]({run_url}) for details.
 ```
 
+## Step 8.5: Post results on linked issue and update labels
+
+If a linked issue was found in Step 6.5:
+
+### If any automated test criteria FAILED:
+
+1. Post a comment on the **issue** (not just the PR) using `mcp__gitea__create_issue_comment`:
+
+```markdown
+❌ **QA Failed** — Test Criteria Failures
+
+PR #{pr_number} was deployed to dev and tested. The following test criteria from this issue failed:
+
+| Criterion | Result | Detail |
+|-----------|--------|--------|
+| {criterion text} | ❌ Fail | {failure detail} |
+| {criterion text} | ✅ Pass | |
+| ... | ... | ... |
+
+{failed_count}/{automated_count} automated criteria failed. The fix needs to address these failures before retesting.
+```
+
+2. **Update issue label:** Swap `status: ready-to-test` or `status: in-review` to `status: in-progress` (signals that `/do-issue` should pick this up and fix the failures)
+
+### If all automated test criteria PASSED:
+
+1. Post a comment on the **issue**:
+
+```markdown
+✅ **QA Passed** — Automated Test Criteria Verified
+
+PR #{pr_number} was deployed to dev. All automated test criteria passed:
+
+| Criterion | Result |
+|-----------|--------|
+| {criterion text} | ✅ Pass |
+| ... | ... |
+| Human verification: {description} | ⏳ Pending |
+
+All {automated_count} automated criteria passed. **Human verification still required** — this issue needs manual signoff before it can be closed.
+```
+
+2. **Update issue label:** Swap current status to `status: in-review` (signals that human verification is the remaining gate)
+
+### If no linked issue:
+
+Skip this step entirely — only post the PR comment from Step 8.
+
 ## Step 9: Report to user
 
 After posting the PR comment, tell the user:
 1. Whether QA passed or failed
-2. How many tests passed/failed
+2. How many tests passed/failed (split by smoke tests vs issue test criteria)
 3. Link to the PR comment
-4. If failed, a brief summary of what broke
+4. If a linked issue was found: link to the issue comment and current label status
+5. If failed, a brief summary of what broke
+6. If passed, remind that human verification is still pending (if applicable)
