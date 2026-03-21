@@ -324,18 +324,52 @@ Create with `mcp__gitea__create_issue`, then label as bug:
 
 ### If deploy failed
 
-Create a Gitea issue:
+#### 1. Classify the failure
+
+Fetch the failing job's logs using `mcp__gitea__actions_run_read(method="get_job_log_preview")`. Classify the root cause:
+
+- **Transient/infrastructure** — network errors (`curl: (35)`, `Connection reset`, `Connection refused`, `timeout`, `DNS resolution failed`), runner OOM, disk full, Docker registry rate limits, download failures for external tools (Helm, kubectl, etc.)
+- **Code/config** — syntax errors, missing files, failed tests, bad Helm values, image build errors from application code
+
+#### 2. Retry transient failures
+
+If the failure is classified as **transient**:
+
+1. Re-run the workflow using `mcp__gitea__actions_run_write(method="rerun_run", run_id={run_id})`
+2. Wait 30 seconds for the re-run to start
+3. Poll the new run's status every 30 seconds for up to 10 minutes (same as Step 8)
+4. If the re-run **succeeds** → proceed to the health check (Step 9 "If deploy succeeded"). Report the deploy as `Passed (retried)` in Step 10.
+5. If the re-run **fails again** → continue to step 3 below
+
+#### 3. Diagnose persistent failures
+
+If the failure is **not transient**, or a transient retry also failed:
+
+1. Fetch the full job logs for all failed jobs in the run
+2. Identify the specific step that failed and extract the error message
+3. Check if the same workflow succeeded on the previous commit (compare with the most recent successful run on the default branch). If it did, the failure is likely related to the new code or an environment change — note this.
+
+#### 4. Create issue with diagnostics
+
+Create a Gitea issue with the diagnostic information:
+
 ```
 Title: Deploy failed after merging #{pr_index}
 Body: PR #{pr_index} ({pr_title}) was merged but the deploy workflow failed.
 
-      Action run status: {status}
-      Branch: {default_branch}
+      **Failure classification:** {transient | code/config}
+      **Failed job:** {job_name}
+      **Failed step:** {step_name}
+      **Error:** {extracted error message — 5-10 relevant lines from the log}
 
-      Investigate and fix the deployment.
+      **Action run:** #{run_number} ({html_url})
+      **Branch:** {default_branch}
+      **Retry attempted:** {yes — also failed / no — not a transient error}
+
+      **Previous deploy:** {succeeded on commit {sha} / also failed — possible ongoing issue}
 ```
 
-Create with `mcp__gitea__create_issue`, then label as bug (same procedure as above).
+Create with `mcp__gitea__issue_write(method="create")`, then label as bug (same procedure as above).
 
 ## Step 10: Report
 
@@ -347,8 +381,8 @@ For each PR that was in scope, report its final status:
 | Repo | PR | Title | CI Fix | Merge | Deploy | Health | Issue |
 |------|----|-------|--------|-------|--------|--------|-------|
 | food-automation | #39 | refactor: enforce layer boundary | — | Merged (rebase, 1 commit) | Passed | Healthy | — |
-| homelab-setup | #45 | feat(#40): add monitoring stack | Fixed (ansible-lint) | Merged (squash, 4→1) | Failed | — | #46 created |
-| recipe-readiness | #8 | fix: parser edge case | — | Merged (rebase, 1 commit) | N/A | N/A | — |
+| homelab-setup | #45 | feat(#40): add monitoring stack | Fixed (ansible-lint) | Merged (squash, 4→1) | Passed (retried) | Healthy | — |
+| recipe-readiness | #8 | fix: parser edge case | — | Merged (rebase, 1 commit) | Failed (network) | — | #46 created |
 | food-automation | #40 | feat: new endpoint | — | Skipped | — | — | — (2 unaddressed comments) |
 ```
 
