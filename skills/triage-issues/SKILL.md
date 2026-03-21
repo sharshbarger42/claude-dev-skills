@@ -82,12 +82,26 @@ If the user chooses to close a duplicate:
 
 If there are no duplicates detected, skip this step silently.
 
+## Step 5c: Check for user-set priority
+
+Read `$HOME/gitea-repos/development-skills/config/current-priority.json` if it exists. If the file exists and its `owner/repo` matches the repo being triaged:
+
+- The **priority issue** (the `issue` field) gets `+10` points in scoring — it always sorts to the top
+- Any issue whose number appears in the `subtasks` list gets `+8` points — these are the next actionable work items
+- Any issue whose number appears in the `blockers` list gets `+9` points — blockers must be resolved before the priority issue can proceed
+- Mark these issues with a `[PRIORITY]` tag in the output so the user can see why they ranked high
+
+If the file doesn't exist or the repo doesn't match, skip this step silently.
+
 ## Step 6: Score and rank actionable issues
 
 Score each actionable issue using these factors (higher = tackle sooner):
 
 | Factor | Points | Condition |
 |--------|--------|-----------|
+| User-set priority issue | +10 | Matches `current-priority.json` issue number (see Step 5c) |
+| User-set priority blocker | +9 | In `current-priority.json` blockers list (see Step 5c) |
+| User-set priority subtask | +8 | In `current-priority.json` subtasks list (see Step 5c) |
 | Milestone due soon | +3 | Issue is in a milestone due within 7 days |
 | Milestone due eventually | +1 | Issue is in a milestone due within 30 days |
 | Has `priority: high` label | +3 | Tackle first |
