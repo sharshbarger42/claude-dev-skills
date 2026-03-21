@@ -69,6 +69,232 @@ Use `mcp__gitea__get_issue_by_index` with the parsed `owner`, `repo`, and `index
 
 If the issue is not found, report the error and stop.
 
+## Step 2a: Detect epic/parent issues
+
+Check whether this issue is a **parent feature issue** with sub-tasks or blockers (an "epic"). Detection criteria — the issue body contains ANY of:
+
+- A `## Sub-tasks` or `## Subtasks` section with checklist items (`- [ ] #N`)
+- A `## Dependencies` section referencing other issues
+- Multiple `#N` issue references in checklist format
+
+**Also check:** Fetch all open issues in the same milestone (if the issue has one) via `mcp__gitea__list_issues` filtered by milestone. Issues that list this issue as "Parent" or "Part of #N" in their body are sub-tasks.
+
+### If this IS an epic/parent issue → enter Epic Mode
+
+1. **Build the work graph:** Collect all sub-task and dependency issue numbers. For each, fetch the issue metadata (title, labels, state). Build a list:
+
+   ```
+   Sub-tasks:
+     - #110 MealMe API client wrapper [status: backlog] — no blockers
+     - #111 PreferencesStore service [status: backlog] — no blockers
+     - #112 Restaurant search endpoint [status: backlog] — blocked by #110, #111
+     ...
+
+   Already completed:
+     - (none, or list closed issues)
+
+   Blocked/decision-needed:
+     - (any with blocking labels)
+   ```
+
+2. **Present to the user** with `AskUserQuestion`:
+
+   ```
+   Issue #{index} is a feature tracker with {N} sub-tasks ({M} remaining, {K} already done).
+
+   {the work graph from above}
+
+   Estimated work: {N} sub-issues will be implemented and PR'd into a feature branch.
+   Blocked items ({B}) will be skipped unless resolved.
+   ```
+
+   Options:
+   - **Yes, implement the full feature** — enter epic mode (continue below)
+   - **Just implement this single issue** — treat it as a normal issue, proceed to Step 2b
+   - **Cancel** — stop
+
+3. **If user confirms epic mode**, set `EPIC_MODE = true` and proceed to **Step E1** (below). Skip Steps 2b through 12 — epic mode has its own flow.
+
+### If this is NOT an epic → proceed normally to Step 2b.
+
+---
+
+## Epic Mode Flow
+
+### Step E1: Create the integration branch
+
+1. `cd` to the local repo path. Verify it exists.
+2. `git fetch origin`
+3. Create the integration branch from the default branch:
+   ```
+   git checkout {default_branch} && git pull origin {default_branch}
+   git checkout -b feature/{index}-{short-slug}
+   ```
+   - `short-slug`: 3-5 words from the parent issue title
+4. Push the integration branch: `git push -u origin feature/{index}-{short-slug}`
+5. **Update status label** on the parent issue: swap `status: backlog` to `status: in-progress`
+
+### Step E2: Plan execution order
+
+Build a dependency-aware execution plan from the work graph:
+
+1. **Tier 0 (no blockers):** Sub-tasks with no dependencies on other sub-tasks — these can start immediately
+2. **Tier 1:** Sub-tasks whose only dependencies are in Tier 0 — start after Tier 0 completes
+3. **Tier N:** Continue until all sub-tasks are scheduled
+4. **Blocked/decision-needed:** Set aside — report at the end
+
+Present the execution plan briefly:
+```
+Execution plan:
+  Tier 0 (parallel): #110, #111, #115
+  Tier 1 (parallel, after Tier 0): #112, #113, #114, #118
+  Tier 2 (parallel, after Tier 1): #116, #117
+  Tier 3 (after Tier 2): #119
+  Tier 4 (after Tier 3): #120, #121
+  Skipped: (none)
+```
+
+### Step E3: Execute sub-tasks
+
+For each tier, run sub-tasks **as concurrently as possible** using the Agent tool:
+
+1. For each sub-task in the current tier, launch an Agent with:
+   - `subagent_type: "general-purpose"`
+   - `isolation: "worktree"` — each sub-task gets its own worktree
+   - Prompt: implement the sub-task issue using the do-issue workflow (Steps 3-11), but with these overrides:
+     - **PR base branch:** `feature/{parent_index}-{short-slug}` (the integration branch), NOT `main`/`{default_branch}`
+     - **PR body:** Include `Part of #{parent_index}` instead of `Closes #{parent_index}`
+     - **PR body:** Include `Closes #{subtask_index}` to auto-close the sub-task on merge
+     - **Skip Step 11** (doc updates) — docs will be updated once at the end
+
+2. Wait for all agents in the tier to complete before starting the next tier.
+
+3. After each tier completes:
+   - Check which sub-tasks succeeded and which failed
+   - For failed sub-tasks, record the error and continue with the next tier (don't block the whole run)
+   - Merge successful PRs into the integration branch via `mcp__gitea__pull_request_write` with `merge_style: "merge"` and `delete_branch: true`
+
+4. After all tiers complete, pull the integration branch to get all merged work:
+   ```
+   git checkout feature/{parent_index}-{short-slug}
+   git pull origin feature/{parent_index}-{short-slug}
+   ```
+
+### Step E4: Verify completeness
+
+After all sub-tasks have been executed, verify the integration branch has complete feature coverage:
+
+1. **Check sub-task status:** Fetch all sub-task issues and verify they are closed (auto-closed by merged PRs). List any that are still open.
+
+2. **Review the integration branch diff:** Run `git diff {default_branch}...feature/{parent_index}-{short-slug}` and compare it against the parent issue's description and acceptance criteria.
+
+3. **Run tests:** If the repo has a test suite, run it against the integration branch to verify nothing is broken:
+   ```bash
+   # Detect and run tests (same detection logic as /test skill)
+   # Python: pytest
+   # Node: npm test
+   # Go: go test ./...
+   ```
+
+4. **Gap analysis:** Check whether the integration branch fully implements what the parent issue describes. Look for:
+   - Features described in the parent issue that aren't covered by any sub-task
+   - Sub-tasks that failed and weren't implemented
+   - Integration gaps (sub-tasks work individually but aren't wired together)
+   - Missing imports, configuration, or glue code between sub-task implementations
+
+### Step E5: Handle gaps
+
+If gaps are found in Step E4:
+
+1. Present the gaps to the user:
+
+   ```
+   Feature verification found {N} gaps:
+
+   1. {gap description} — {which sub-task was supposed to cover this, or "no sub-task covers this"}
+   2. ...
+
+   Failed sub-tasks (not implemented):
+   - #{index} {title} — {error reason}
+   ```
+
+2. Use `AskUserQuestion`:
+   - **Create bug issues for gaps** — use `/investigate-bug` style issue creation (with `bug` label, Test Criteria section, human verification gate) for each gap. Link each bug to the parent feature issue (`Part of #{parent_index}`)
+   - **Fix gaps now** — attempt to fix the gaps directly on the integration branch (simpler/faster for small glue-code gaps)
+   - **Skip — accept as-is** — proceed without addressing gaps
+
+3. If bug issues are created, list them and note they'll need to be fixed before the feature is complete.
+
+### Step E6: Create the feature PR
+
+If all sub-tasks passed (or gaps are accepted/fixed):
+
+1. Create a PR from the integration branch to the default branch:
+   - **Title:** `feat(#{parent_index}): {parent issue title}`
+   - **Body:**
+     ```
+     ## Summary
+
+     {Parent issue description summary}
+
+     ## Sub-tasks completed
+
+     - #{sub1} {title} — merged via PR #{pr1}
+     - #{sub2} {title} — merged via PR #{pr2}
+     ...
+
+     ## Sub-tasks skipped/failed
+
+     - #{subN} {title} — {reason}
+     (or "None — all sub-tasks completed successfully")
+
+     ## Gaps found
+
+     - {gap description} → #{bug_issue}
+     (or "None — feature is complete")
+
+     Closes #{parent_index}
+     ```
+   - **base:** `{default_branch}`
+   - **head:** `feature/{parent_index}-{short-slug}`
+
+2. Run `/review-pr` on the feature PR.
+
+3. **Update status label:** Swap `status: in-progress` to `status: in-review` on the parent issue.
+
+### Step E7: Report and offer QA
+
+Present the epic run summary:
+
+```
+## Epic Complete: #{parent_index} {parent_title}
+
+**Integration branch:** feature/{parent_index}-{short-slug}
+**Feature PR:** #{pr_number}
+
+### Sub-task results
+| Issue | Title | Status | PR |
+|-------|-------|--------|-----|
+| #{sub1} | {title} | ✅ Done | #{pr1} |
+| #{sub2} | {title} | ✅ Done | #{pr2} |
+| #{subN} | {title} | ❌ Failed | — |
+
+### Summary
+- {completed}/{total} sub-tasks completed
+- {gap_count} gaps found → {bug_count} bug issues created
+- Feature PR #{pr_number} ready for review
+```
+
+If the run was fully successful (no failed sub-tasks, no gap bugs created):
+
+Use `AskUserQuestion`:
+- **Run QA now** — invoke `/qa-pr {repo}#{feature_pr_number}`
+- **Skip QA** — done for now
+
+If there were failures or bugs created, inform the user that QA should wait until the bugs are resolved.
+
+---
+
 ## Step 2b: Check for pending decisions
 
 If the issue has a `decision-needed` label:
