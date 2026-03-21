@@ -301,7 +301,33 @@ export NVM_DIR="$HOME/.nvm"
 NVMRC
 fi
 
-# --- 9. Zsh plugins ---
+# --- 9. VS Code integration ---
+echo ""
+echo "--- VS Code ---"
+if command_exists code; then
+    echo "  [skip] code already available"
+else
+    # Try to detect and symlink VS Code from Windows mount
+    WIN_USER=$(cmd.exe /C "echo %USERNAME%" 2>/dev/null | tr -d '\r' || true)
+    VSCODE_USER="/mnt/c/Users/$WIN_USER/AppData/Local/Programs/Microsoft VS Code/bin/code"
+    VSCODE_SYS="/mnt/c/Program Files/Microsoft VS Code/bin/code"
+
+    if [[ -n "$WIN_USER" && -f "$VSCODE_USER" ]]; then
+        sudo ln -sf "$VSCODE_USER" /usr/local/bin/code
+        echo "  Linked: code -> $VSCODE_USER"
+    elif [[ -f "$VSCODE_SYS" ]]; then
+        sudo ln -sf "$VSCODE_SYS" /usr/local/bin/code
+        echo "  Linked: code -> $VSCODE_SYS"
+    elif [[ ! -d "/mnt/c" ]]; then
+        echo "  [skip] Windows mount not available (/mnt/c not found)"
+        echo "  VS Code will be configured when readonly mount is enabled"
+    else
+        echo "  [skip] VS Code not found on Windows"
+        echo "  Install VS Code on Windows, then re-run this step"
+    fi
+fi
+
+# --- 10. Zsh plugins ---
 echo ""
 echo "--- Zsh Plugins ---"
 ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
@@ -340,6 +366,7 @@ echo "  - Node.js (via nvm)"
 echo "  - Claude Code CLI"
 echo "  - Oh My Zsh"
 echo "  - development-skills"
+command_exists code && echo "  - VS Code (code .)"
 echo ""
 echo "Configured:"
 GIT_CONFIGURED_NAME=$(git config --global user.name 2>/dev/null || true)

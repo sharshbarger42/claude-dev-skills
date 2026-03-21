@@ -276,6 +276,8 @@ echo "sudo_rules=$(test -f /etc/sudoers.d/claude-user && echo Y || echo N)"
 echo "wsl_conf=$(grep -q 'default=claude-user' /etc/wsl.conf 2>/dev/null && echo Y || echo N)"
 echo "dev_skills=$(test -d /home/claude-user/development-skills && echo Y || echo N)"
 echo "shared_dir=$(grep -q 'drvfs' /etc/fstab 2>/dev/null && echo Y || echo N)"
+echo "vscode=$(test -L /usr/local/bin/code && echo Y || echo N)"
+echo "ro_mount=$(grep -q 'options=ro' /etc/wsl.conf 2>/dev/null && echo Y || echo N)"
 '@
     $checkOutput = ($checkScript | Invoke-Wsl -d Ubuntu-Claude -u root -- bash | Out-String)
 
@@ -304,6 +306,8 @@ echo "shared_dir=$(grep -q 'drvfs' /etc/fstab 2>/dev/null && echo Y || echo N)"
         "sudo_rules"  = "sudo permissions"
         "dev_skills"  = "development-skills repo"
         "shared_dir"  = "shared directory"
+        "ro_mount"    = "readonly Windows mount"
+        "vscode"      = "VS Code (code .)"
     }
     Write-Host ""
     foreach ($entry in $labels.GetEnumerator()) {
@@ -323,13 +327,16 @@ echo "shared_dir=$(grep -q 'drvfs' /etc/fstab 2>/dev/null && echo Y || echo N)"
     Write-Host ""
 
     $sudoMissing = -not $status["sudo_rules"]
+    $vscodeMissing = -not $status["vscode"] -or -not $status["ro_mount"]
     $defaultNums = @("1")
     if ($sudoMissing) { $defaultNums += "2" }
+    if ($vscodeMissing) { $defaultNums += "3" }
     $defaultStr = $defaultNums -join ","
 
     if ($Defaults) {
         Write-Host "  [defaults] Applying updates: $defaultStr" -ForegroundColor Yellow
         $DoRepoSync = $true
+        $doVSCodeSetup = $vscodeMissing
     } elseif ($DryRun) {
         Write-Host "  [dry-run] Would offer update menu (defaults: $defaultStr)" -ForegroundColor Yellow
         $DoRepoSync = $true
@@ -337,9 +344,11 @@ echo "shared_dir=$(grep -q 'drvfs' /etc/fstab 2>/dev/null && echo Y || echo N)"
         Write-Host "  Available updates:" -ForegroundColor Cyan
         $d1 = if ($defaultNums -contains "1") { "*" } else { " " }
         $d2 = if ($defaultNums -contains "2") { "*" } else { " " }
+        $d3 = if ($defaultNums -contains "3") { "*" } else { " " }
         Write-Host "   $d1 1. Sync development-skills repo"
         Write-Host "   $d2 2. Reconfigure sudo permissions"
-        Write-Host "     3. All of the above"
+        Write-Host "   $d3 3. Enable VS Code + readonly Windows mount"
+        Write-Host "     4. All of the above"
         Write-Host ""
         Write-Host "  * = recommended  |  0 = skip all" -ForegroundColor DarkGray
         Write-Host ""
@@ -347,7 +356,7 @@ echo "shared_dir=$(grep -q 'drvfs' /etc/fstab 2>/dev/null && echo Y || echo N)"
         if ([string]::IsNullOrWhiteSpace($menuChoice)) { $menuChoice = $defaultStr }
 
         $selected = @($menuChoice -split "," | ForEach-Object { $_.Trim() })
-        $doAll = $selected -contains "3"
+        $doAll = $selected -contains "4"
 
         if ($selected -contains "0") {
             $DoRepoSync = $false
@@ -355,6 +364,7 @@ echo "shared_dir=$(grep -q 'drvfs' /etc/fstab 2>/dev/null && echo Y || echo N)"
         } else {
             $DoRepoSync = $doAll -or $selected -contains "1"
             $doSudoReconfig = $doAll -or $selected -contains "2"
+            $doVSCodeSetup = $doAll -or $selected -contains "3"
         }
     }
 
@@ -367,6 +377,61 @@ echo "shared_dir=$(grep -q 'drvfs' /etc/fstab 2>/dev/null && echo Y || echo N)"
         Write-Host "  Sudo permissions updated." -ForegroundColor Green
     } elseif ($doSudoReconfig -and $DryRun) {
         Write-Host "[Would reconfigure] sudo permissions" -ForegroundColor Yellow
+    }
+
+    # --- Enable VS Code + readonly mount if selected ---
+    if ($doVSCodeSetup -and -not $DryRun) {
+        Write-Host "`nEnabling VS Code + readonly Windows mount..." -ForegroundColor Cyan
+
+        # Update wsl.conf automount to readonly
+        $roMountScript = @'
+#!/bin/bash
+set -e
+# Update automount section to enabled=true with ro,metadata
+if grep -q '^\[automount\]' /etc/wsl.conf; then
+    sed -i '/^\[automount\]/,/^\[/{
+        s/^enabled=.*/enabled=true/
+        /^options=/d
+    }' /etc/wsl.conf
+    if ! sed -n '/^\[automount\]/,/^\[/p' /etc/wsl.conf | grep -q '^enabled='; then
+        sed -i '/^\[automount\]/a enabled=true' /etc/wsl.conf
+    fi
+    if ! sed -n '/^\[automount\]/,/^\[/p' /etc/wsl.conf | grep -q '^options='; then
+        sed -i '/^\[automount\]/,/^\[/{/^mountFsTab/a options=ro,metadata
+}' /etc/wsl.conf
+    fi
+else
+    printf '\n[automount]\nenabled=true\nmountFsTab=true\noptions=ro,metadata\n' >> /etc/wsl.conf
+fi
+'@
+        $roMountScript | Invoke-Wsl -d Ubuntu-Claude -u root -- bash -c "tr -d '\r' > /tmp/setup-ro-mount.sh"
+        Invoke-Wsl -d Ubuntu-Claude -u root -- bash /tmp/setup-ro-mount.sh
+        Write-Host "  Readonly automount configured." -ForegroundColor Green
+
+        # Create VS Code symlink (need to restart WSL first for mount to be active)
+        Write-Host "  Restarting WSL for mount to take effect..." -ForegroundColor Cyan
+        wsl.exe --terminate Ubuntu-Claude
+        Start-Sleep -Seconds 2
+
+        $WinUser = $env:USERNAME.ToLower()
+        $VSCodeUserPath = "C:\Users\$env:USERNAME\AppData\Local\Programs\Microsoft VS Code\bin\code"
+        $VSCodeSysPath = "C:\Program Files\Microsoft VS Code\bin\code"
+        if (Test-Path $VSCodeUserPath) {
+            $vscodeMntPath = "/mnt/c/Users/$WinUser/AppData/Local/Programs/Microsoft VS Code/bin/code"
+            Invoke-Wsl -d Ubuntu-Claude -u root -- bash -c "ln -sf '$vscodeMntPath' /usr/local/bin/code"
+            Write-Host "  Linked: code -> $VSCodeUserPath" -ForegroundColor Green
+        } elseif (Test-Path $VSCodeSysPath) {
+            $vscodeMntPath = "/mnt/c/Program Files/Microsoft VS Code/bin/code"
+            Invoke-Wsl -d Ubuntu-Claude -u root -- bash -c "ln -sf '$vscodeMntPath' /usr/local/bin/code"
+            Write-Host "  Linked: code -> $VSCodeSysPath" -ForegroundColor Green
+        } else {
+            Write-Host "  [skip] VS Code not found on Windows" -ForegroundColor Yellow
+            Write-Host "  Install VS Code and re-run setup to enable 'code .' support" -ForegroundColor Yellow
+        }
+
+        Write-Host "  Done. Run 'code .' from Ubuntu-Claude to open VS Code." -ForegroundColor Green
+    } elseif ($doVSCodeSetup -and $DryRun) {
+        Write-Host "[Would enable] VS Code + readonly Windows mount" -ForegroundColor Yellow
     }
 }
 
@@ -412,7 +477,7 @@ Then re-run this script.
     $fstabLine = ""
     $mountDir = ""
     if (-not [string]::IsNullOrWhiteSpace($SharedWinPath) -and -not [string]::IsNullOrWhiteSpace($SharedMountPoint)) {
-        $fstabLine = "$SharedWinPath $SharedMountPoint drvfs defaults 0 0"
+        $fstabLine = "$SharedWinPath $SharedMountPoint drvfs ro 0 0"
         $mountDir = $SharedMountPoint
     }
 
@@ -432,8 +497,9 @@ systemd=true
 default=claude-user
 
 [automount]
-enabled=false
+enabled=true
 mountFsTab=true
+options=ro,metadata
 
 [interop]
 appendWindowsPath=false
@@ -456,6 +522,23 @@ passwd -l $WinUser 2>/dev/null || true
 "@
     $setupScript | Invoke-Wsl -d Ubuntu-Claude -u root -- bash -c "tr -d '\r' > /tmp/setup-distro.sh"
     Invoke-Wsl -d Ubuntu-Claude -u root -- bash /tmp/setup-distro.sh
+
+    # --- Set up VS Code symlink ---
+    Write-Host "Setting up VS Code integration..." -ForegroundColor Cyan
+    $VSCodeUserPath = "C:\Users\$WinUser\AppData\Local\Programs\Microsoft VS Code\bin\code"
+    $VSCodeSysPath = "C:\Program Files\Microsoft VS Code\bin\code"
+    if (Test-Path $VSCodeUserPath) {
+        $vscodeMntPath = "/mnt/c/Users/$WinUser/AppData/Local/Programs/Microsoft VS Code/bin/code"
+        Invoke-Wsl -d Ubuntu-Claude -u root -- bash -c "ln -sf '$vscodeMntPath' /usr/local/bin/code"
+        Write-Host "  Linked: code -> $VSCodeUserPath" -ForegroundColor Green
+    } elseif (Test-Path $VSCodeSysPath) {
+        $vscodeMntPath = "/mnt/c/Program Files/Microsoft VS Code/bin/code"
+        Invoke-Wsl -d Ubuntu-Claude -u root -- bash -c "ln -sf '$vscodeMntPath' /usr/local/bin/code"
+        Write-Host "  Linked: code -> $VSCodeSysPath" -ForegroundColor Green
+    } else {
+        Write-Host "  [skip] VS Code not found on Windows" -ForegroundColor Yellow
+        Write-Host "  Install VS Code and re-run setup to enable 'code .' support" -ForegroundColor Yellow
+    }
 
     Write-Host "Terminating Ubuntu-Claude so wsl.conf takes effect..." -ForegroundColor Cyan
     wsl.exe --terminate Ubuntu-Claude
@@ -522,7 +605,7 @@ if (-not $DryRun -and $ubuntuClaudeExists -and -not [string]::IsNullOrWhiteSpace
     }
 
     if ($applyMount) {
-        $fstabEntry = "$SharedWinPath $SharedMountPoint drvfs defaults 0 0"
+        $fstabEntry = "$SharedWinPath $SharedMountPoint drvfs ro 0 0"
         $mountScript = @"
 #!/bin/bash
 sed -i '/drvfs/d' /etc/fstab 2>/dev/null || true
