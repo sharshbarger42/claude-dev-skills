@@ -259,20 +259,79 @@ curl -sf {dev_health_url}
 
 **If the chart version or image doesn't match expectations:** Add a warning line to the comment: `⚠️ Version mismatch — expected chart {expected}, got {actual}. The deployed version may not match the PR.` Still proceed to smoke tests, but the mismatch will be visible in the audit trail.
 
-## Step 6.5: Fetch issue test criteria
+## Step 6.5: Fetch issue test criteria and triage testability
 
 If the PR body contains `Closes #N` or `Fixes #N`, extract the linked issue number and fetch it:
 
 1. Parse the PR body for issue references matching `Closes #(\d+)` or `Fixes #(\d+)` (case-insensitive)
 2. If found, fetch the issue via `mcp__gitea__get_issue_by_index` with the parsed `owner`, `repo`, and issue `index`
 3. Parse the issue body for a `## Test Criteria` section
-4. Extract all checklist items (`- [ ] ...`) from that section — these are the **issue test criteria**
+4. Extract all checklist items (`- [ ] ...` and `- [x] ...`) from that section — these are the **issue test criteria**
 5. Separate them into:
-   - **Automated criteria** — all items except the last "Human verification" item
-   - **Human verification** — the final item starting with "Human verification:"
-6. Store both lists for use in Step 7
+   - **Human verification** — items explicitly starting with "Human verification:" — these are the ONLY items that can be skipped
+   - **Automated criteria** — ALL other items, regardless of whether they involve frontend, backend, POST requests, data mutations, or any other operation
 
 If no linked issue is found, or the issue has no Test Criteria section, proceed with smoke tests only.
+
+### Step 6.6: Triage — identify untestable criteria
+
+After extracting criteria, analyze each **automated criterion** (not human verification) to determine if it is genuinely impossible for an AI agent to test, even with full access to the dev environment.
+
+**The dev environment exists for testing.** It is safe and expected to:
+- Make POST/PUT/DELETE requests that create, modify, or delete data
+- Trigger workflows, ingest tickets, advance tasks, etc.
+- Create test data as needed to exercise the code path under test
+- Read and verify DOM-rendered content by fetching HTML and inspecting it
+- Check API responses that reflect frontend-visible state
+
+A criterion is **genuinely untestable by AI** ONLY if it requires:
+- Physical human judgment (e.g., "does this look right visually?", "is the UX intuitive?")
+- Interactive multi-step browser sessions that cannot be decomposed into HTTP requests (e.g., drag-and-drop, real-time animation timing)
+- Access to systems the agent has no credentials for
+
+A criterion is **NOT untestable** just because it:
+- Involves POST/PUT/DELETE requests — the dev environment is meant for this
+- Mentions frontend behavior — if the behavior is driven by API data, test the API
+- Mentions DOM elements — fetch the HTML/JS and verify the rendering logic, or verify the API data that drives it
+- Would create or modify data — that's what dev is for
+- Was previously "code-verified" — code verification is not a substitute for live testing when a live dev environment is available
+
+**If any automated criteria are genuinely untestable**, ask the user before proceeding:
+
+Use `AskUserQuestion` to present the untestable criteria and ask:
+
+```
+These test criteria appear to require human judgment and cannot be verified by automated testing:
+
+1. "{criterion text}" — {reason it's untestable}
+2. ...
+
+Should I add "Human verification:" prefix to these criteria in the issue (making them human-only), or should I attempt to test them anyway?
+```
+
+Options:
+- **Mark as human-only** — update the issue body to prefix these with "Human verification:" and treat them as pending human signoff
+- **Test anyway** — attempt the best possible automated verification (may produce imprecise results)
+
+If ALL automated criteria are testable (the common case), skip this question entirely and proceed to Step 7.
+
+### Step 6.7: Plan test execution for each criterion
+
+For each automated criterion, plan HOW to test it against the live dev environment:
+
+1. **Read the criterion carefully** — understand what state or behavior it's verifying
+2. **Identify prerequisite actions** — does the test require creating data first? (e.g., POST to ingest a ticket before checking its state)
+3. **Identify the verification request** — what HTTP request proves the criterion? (e.g., GET the task and check `state` field)
+4. **Plan the sequence** — prerequisite actions first, then verification
+5. **Record the plan** for execution in Step 7
+
+Example plans:
+- Criterion: `POST /support-tickets/ingest response includes "state": "coding"`
+  → Plan: POST to `/support-tickets/ingest` with test payload, check response JSON for `state: "coding"`
+- Criterion: `Task card on Kanban board shows in "coding" column`
+  → Plan: After ingesting a test ticket, GET `/api/tasks` and verify the task appears in the `coding` array (the Kanban board renders from this API response)
+- Criterion: `selectTask(taskId) shows state: "coding" in detail panel`
+  → Plan: GET `/api/tasks/{id}` for the test task and verify `state: "coding"` (the detail panel renders from this API response)
 
 ## Step 7: Run smoke tests
 
@@ -313,31 +372,31 @@ Run ALL smoke endpoints from the deploy config table (Step 3) against `{dev_base
 
 ### Issue test criteria (from Step 6.5)
 
-After running smoke tests, run each **automated criterion** from the issue's Test Criteria section. For each criterion:
+After running smoke tests, execute each **automated criterion** from the issue's Test Criteria section against the live dev environment. Follow the test execution plan from Step 6.7.
 
-1. **Assess testability first:** Determine whether the criterion can be verified via HTTP requests (curl) against the dev environment. A criterion is **testable** if it can be checked with HTTP requests, JSON response inspection, or HTML content checks. A criterion is **untestable** if it requires browser JavaScript execution, DOM interaction, visual inspection, or client-side state that cannot be observed via HTTP alone.
-2. If **testable**: interpret it as an HTTP check, execute it against the dev environment, and record pass/fail
-3. If **untestable**: record the result as `"skipped"` with detail explaining why (e.g., "Requires browser DOM inspection — cannot verify via HTTP")
-4. Mark the criterion source as `issue` (vs `smoke` for the default tests)
+**Execution rules:**
 
-**Human verification criteria are NOT executed** — they are included in the results table as `PENDING` with a note that human signoff is required.
+1. **Execute every automated criterion live.** There is no "skip" option for automated criteria. The dev environment exists for testing — use it.
+2. **Create test data if needed.** If a criterion requires specific state (e.g., a task in "coding" state), create that state by making the appropriate API calls (POST to ingest, advance, etc.) before verifying.
+3. **Test the API that drives the UI.** Frontend criteria that mention DOM elements, Kanban columns, or detail panels are testing that the API returns correct data. The frontend renders from API responses — verify the API response contains the expected values.
+4. **Mark the criterion source as `issue`** (vs `smoke` for the default tests).
+5. **Human verification criteria are NOT executed** — they are included in the results table as `PENDING` with a note that human signoff is required. These are the ONLY criteria that can be pending.
 
-**CRITICAL:** A criterion marked `skipped` is NOT the same as `passed`. Skipped criteria count against the overall QA verdict — see Step 8.
+**There is no "skipped" status for automated criteria.** Every non-human criterion must be either `passed` or `failed`. If a test can't be executed due to an infrastructure issue (e.g., endpoint down, 500 error), that's a `failed` test, not a skipped one.
 
 ### Collecting results
 
-Build a results list. The `passed` field has four possible values:
+Build a results list. The `passed` field has three possible values:
 - `true` — test executed and passed
 - `false` — test executed and failed
-- `"skipped"` — automated criterion that could not be tested via HTTP (requires browser, DOM, etc.)
-- `"pending"` — human verification criterion (never executed)
+- `"pending"` — human verification criterion (never executed — the ONLY type that can be non-pass/fail)
 
 ```
 [
   { "name": "Health check", "source": "smoke", "endpoint": "/api/health", "status": 200, "passed": true, "detail": "" },
   { "name": "Task list", "source": "smoke", "endpoint": "/api/tasks", "status": 500, "passed": false, "detail": "Internal server error: database locked" },
-  { "name": "Dashboard loads under 5s", "source": "issue", "endpoint": "/", "status": 200, "passed": true, "detail": "Loaded in 1.2s" },
-  { "name": "selectTask shows state: coding", "source": "issue", "endpoint": "-", "status": "-", "passed": "skipped", "detail": "Requires browser DOM inspection — cannot verify via HTTP" },
+  { "name": "POST /ingest returns state: coding", "source": "issue", "endpoint": "/support-tickets/ingest", "status": 200, "passed": true, "detail": "Response contains state: coding" },
+  { "name": "Task in coding column via API", "source": "issue", "endpoint": "/api/tasks", "status": 200, "passed": true, "detail": "Task bd-xxx found in tasks.coding array" },
   { "name": "Human verification", "source": "issue", "endpoint": "-", "status": "-", "passed": "pending", "detail": "Owner confirms fix works" },
   ...
 ]
@@ -351,11 +410,10 @@ Compose and post a PR comment using `mcp__gitea__create_issue_comment` with the 
 
 The verdict is determined by ALL results (smoke tests + issue criteria):
 
-- **QA Passed** — every executed test passed AND zero criteria were skipped. All non-human criteria were verified.
-- **QA Partial** — every executed test passed BUT some automated criteria were skipped (untestable via HTTP). The skipped criteria need manual or browser-based verification.
-- **QA Failed** — one or more tests actually failed (returned wrong status, error, etc.)
+- **QA Passed** — every automated test passed. Human verification criteria may still be pending but do not block the verdict.
+- **QA Failed** — one or more automated tests failed (returned wrong status, error, unexpected data, etc.)
 
-**CRITICAL:** `skipped` criteria are NOT treated as passed. If any automated criterion was skipped, the verdict is **Partial** at best, never **Passed**.
+There is no "Partial" verdict. Every automated criterion is either tested and passed, or tested and failed. The only items that can remain unresolved are human verification criteria (marked as `pending`).
 
 ### If ALL tests passed (no skipped, no failed)
 
@@ -381,31 +439,6 @@ The `{deploy_summary}` should reflect what happened:
 - Full deploy: `Workflow run #{run_number} — {conclusion}`
 - Chart existed, Flux waited: `Skipped build (chart from run #{existing_run_number}), waited for Flux rollout`
 - Chart already deployed: `Skipped deploy (chart 0.1.0-dev.{run_number} already deployed)`
-
-### If all executed tests passed BUT some criteria were skipped
-
-```markdown
-⚠️ **QA Partial** — some criteria could not be verified
-
-**Branch:** `{head_branch}` ({head_sha_short})
-**Deploy:** {deploy_summary}
-**Environment:** dev
-
-| Test | Endpoint | Status | Result |
-|------|----------|--------|--------|
-| Health check | `/api/health` | 200 | ✅ Pass |
-| selectTask shows state | — | — | ⏭️ Skipped |
-| ... | ... | ... | ... |
-
-### Skipped criteria (require manual/browser verification)
-
-| Criterion | Reason |
-|-----------|--------|
-| {criterion text} | {why it couldn't be tested — e.g., "Requires browser DOM inspection"} |
-| ... | ... |
-
-{passed_count}/{total_count} tests passed, {skipped_count} skipped. **Not ready for merge** — skipped criteria must be verified manually or via browser testing before approval.
-```
 
 ### If ANY tests failed
 
@@ -452,8 +485,8 @@ The deploy workflow failed before smoke tests could run. Check the [workflow run
 
 After posting the PR comment, update the PR's status label:
 
-- **QA passed, no human verification needed** → set `pr: ready-to-merge`
-- **QA passed, human verification still needed** → keep `pr: needs-qa` (human step remaining)
+- **QA passed, no human verification pending** → set `pr: ready-to-merge`
+- **QA passed, human verification still pending** → keep `pr: needs-qa` (human step remaining)
 - **QA failed** → set `pr: comments-pending` (needs fixes before re-test)
 
 Use the PR status label swap procedure from pr-status-labels.md.
@@ -502,26 +535,6 @@ All {automated_count} automated criteria passed. **Human verification still requ
 
 2. **Update issue label:** Swap current status to `status: in-review` (signals that human verification is the remaining gate)
 
-### If no criteria failed BUT some were skipped:
-
-1. Post a comment on the **issue**:
-
-```markdown
-⚠️ **QA Partial** — Some Test Criteria Could Not Be Verified
-
-PR #{pr_number} was deployed to dev. No tests failed, but {skipped_count} automated criteria could not be verified via HTTP and need manual/browser verification:
-
-| Criterion | Result | Detail |
-|-----------|--------|--------|
-| {criterion text} | ✅ Pass | |
-| {criterion text} | ⏭️ Skipped | {reason — e.g., "Requires browser DOM inspection"} |
-| ... | ... | ... |
-| Human verification: {description} | ⏳ Pending | |
-
-{passed_count}/{automated_count} automated criteria verified. **{skipped_count} criteria need manual/browser testing** before this can be approved.
-```
-
-2. **Do NOT update issue label** — leave it as-is (do NOT swap to `status: in-review`). The issue is not ready for human-only verification because automated criteria remain unverified.
 
 ### Step 8.6: Update issue checklist
 
@@ -534,13 +547,12 @@ After posting the issue comment, update the **issue body** to check off test cri
    - Append a brief annotation: ` — *{verification_method} in PR #{pr_number}*`
      - `verification_method` is one of: `verified live`, `code-verified`, `smoke-tested`
 3. For criteria that **failed**, leave them as `- [ ]` (unchecked)
-4. For criteria that were **skipped** (untestable via HTTP), leave them as `- [ ]` (unchecked) — do NOT check them off. They were not verified.
-5. For **human verification** criteria, always leave as `- [ ]`
+4. For **human verification** criteria, always leave as `- [ ]`
 6. Use `mcp__gitea__issue_write` with `method: "update"` to save the updated body
 
 **Important:** Only modify the `- [ ]` / `- [x]` checkboxes and append annotations. Do not alter any other part of the issue body.
 
-**CRITICAL:** Never mark a criterion as `[x]` unless it was actually executed and returned a passing result (`passed: true`). Criteria with `passed: "skipped"` or `passed: "pending"` must remain unchecked.
+**CRITICAL:** Never mark a criterion as `[x]` unless it was actually executed and returned a passing result (`passed: true`). Criteria with `passed: "pending"` (human verification) must remain unchecked.
 
 ### If no linked issue:
 
@@ -549,10 +561,9 @@ Skip this step entirely — only post the PR comment from Step 8.
 ## Step 9: Report to user
 
 After posting the PR comment, tell the user:
-1. Whether QA passed, partially passed, or failed
-2. How many tests passed/failed/skipped (split by smoke tests vs issue test criteria)
+1. Whether QA passed or failed
+2. How many tests passed/failed (split by smoke tests vs issue test criteria)
 3. Link to the PR comment
 4. If a linked issue was found: link to the issue comment and current label status
 5. If failed, a brief summary of what broke
-6. If partial, list which criteria were skipped and why — these need manual verification
-7. If passed, remind that human verification is still pending (if applicable)
+6. If passed, remind that human verification is still pending (if applicable)
