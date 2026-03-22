@@ -139,22 +139,18 @@ After each PR, log the result:
 
 ## Step 5: Wait for CI on rebased PRs
 
+Use the shared check-ci procedure for accurate CI status:
+
+!`cat $HOME/.claude/development-skills/lib/check-ci.md`
+
 For each PR that was successfully rebased (status = `rebased`):
 
 1. Wait 15 seconds for CI to trigger on the new head commit
-2. Fetch the updated PR to get the new `head.sha`:
-   ```
-   mcp__gitea__get_pull_request_by_index(owner, repo, index)
-   ```
-3. Check commit status for the new head SHA using the Gitea API:
-   ```bash
-   curl -s "https://git.home.superwerewolves.ninja/api/v1/repos/{owner}/{repo}/commits/{new_head_sha}/status" \
-     -H "Authorization: token {GITEA_TOKEN}"
-   ```
-4. If all statuses are `pending` or `running`, poll every 30 seconds for up to 10 minutes
-5. Record the final CI state: `success`, `failure`, `pending` (timed out), or `no-ci` (no status checks configured)
+2. Run the check-ci procedure (which re-fetches the PR for fresh HEAD SHA, checks commit statuses, and cross-references with action runs)
+3. If state is `running`, poll every 30 seconds for up to 10 minutes
+4. Record the final CI state: `passed`, `failed`, `running` (timed out), or `no-ci`
 
-For PRs that were `up-to-date`, check their **existing** CI status (no need to wait — it hasn't changed).
+For PRs that were `up-to-date`, run the check-ci procedure to get their current CI status.
 
 For PRs with `conflicts`, skip CI check.
 

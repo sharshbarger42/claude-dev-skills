@@ -81,14 +81,17 @@ Mark each PR as `ready` or `not ready ({N} unaddressed comments)`.
 
 ## Step 4: Check CI/action status
 
+Use the shared check-ci procedure for accurate CI status:
+
+!`cat $HOME/.claude/development-skills/lib/check-ci.md`
+
 For each PR marked `ready` from Step 3:
 
-1. Use the head commit SHA from the PR metadata
-2. Call `mcp__gitea__list_repo_action_runs` to find workflow runs — look for runs where the branch matches the PR's head branch
-3. Check that all completed runs have `status: "success"`
-4. If any run has `status: "failure"`, mark the PR as `ci_failed` with the failing run name and workflow path
-5. If any run is still `running` or `pending`, wait up to 5 minutes (poll every 30s), then re-check. If still not done, mark as `not mergeable (CI in progress)`
-6. If no runs exist for the branch, treat CI as passed (repo may not have CI configured)
+1. Run the check-ci procedure (re-fetches PR for fresh HEAD SHA, checks commit statuses, cross-references with action runs)
+2. If state is `passed`, mark the PR as `ci_passed`
+3. If state is `failed`, mark the PR as `ci_failed` with the failing run name and workflow path
+4. If state is `running`, wait up to 5 minutes (poll every 30s via the procedure's polling mode), then re-check. If still not done, mark as `not mergeable (CI in progress)`
+5. If state is `no-ci`, treat CI as passed (repo has no CI configured)
 
 ## Step 4b: Fix CI failures
 
