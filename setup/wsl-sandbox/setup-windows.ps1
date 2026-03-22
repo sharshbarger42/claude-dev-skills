@@ -21,20 +21,33 @@ param(
 
 $BACKGROUND_URL = ""
 
+$RoamingStateCheck = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\RoamingState"
 if (-not $DryRun -and -not $Defaults) {
-    Write-Host ""
-    Write-Host "Background Image Setup" -ForegroundColor Cyan
-    Write-Host "You can optionally set a background image for the terminal." -ForegroundColor Yellow
-    Write-Host ""
-    $response = Read-Host "Do you have a background image (URL or local path)? (y/N)"
-    if ($response -eq "y" -or $response -eq "Y") {
+    if (Test-Path "$RoamingStateCheck\background.jpg") {
         Write-Host ""
-        Write-Host "Enter either:" -ForegroundColor Yellow
-        Write-Host "  - A URL: https://example.com/image.jpg" -ForegroundColor Yellow
-        Write-Host "  - A local path: C:\Users\...\Pictures\image.jpg" -ForegroundColor Yellow
+        Write-Host "Background Image" -ForegroundColor Cyan
+        Write-Host "  Already configured: $RoamingStateCheck\background.jpg" -ForegroundColor Green
+        $response = Read-Host "  Replace it? (y/N)"
+        if ($response -eq "y" -or $response -eq "Y") {
+            Remove-Item "$RoamingStateCheck\background.jpg" -Force
+            Write-Host "  Enter the new image URL or local path:" -ForegroundColor Yellow
+            $BACKGROUND_URL = Read-Host "  Background image"
+        }
+    } else {
         Write-Host ""
-        $BACKGROUND_URL = Read-Host "Background image"
+        Write-Host "Background Image Setup" -ForegroundColor Cyan
+        Write-Host "You can optionally set a background image for the terminal." -ForegroundColor Yellow
         Write-Host ""
+        $response = Read-Host "Do you have a background image (URL or local path)? (y/N)"
+        if ($response -eq "y" -or $response -eq "Y") {
+            Write-Host ""
+            Write-Host "Enter either:" -ForegroundColor Yellow
+            Write-Host "  - A URL: https://example.com/image.jpg" -ForegroundColor Yellow
+            Write-Host "  - A local path: C:\Users\...\Pictures\image.jpg" -ForegroundColor Yellow
+            Write-Host ""
+            $BACKGROUND_URL = Read-Host "Background image"
+            Write-Host ""
+        }
     }
 } elseif ($Defaults) {
     Write-Host "  [defaults] Skipping background image." -ForegroundColor Yellow
@@ -208,12 +221,24 @@ if ($DryRun) {
 } elseif ($Defaults) {
     Write-Host "  [defaults] Skipping shared directory." -ForegroundColor Yellow
 } else {
+    # Check if a shared directory is already configured (existing distro)
+    $existingShare = ""
+    if ($ubuntuClaudeExists) {
+        $existingShare = (Invoke-Wsl -d Ubuntu-Claude -u root -- bash -c "grep 'drvfs' /etc/fstab 2>/dev/null | grep -v '^#' || true" | Out-String).Trim()
+    }
+
     Write-Host ""
     Write-Host "Shared Windows Directory" -ForegroundColor Cyan
-    Write-Host "  Automount is disabled for sandbox isolation, but you can share" -ForegroundColor Yellow
-    Write-Host "  a single Windows directory into WSL." -ForegroundColor Yellow
-    Write-Host ""
-    $shareResponse = Read-Host "  Share a Windows directory? (y/N)"
+    if (-not [string]::IsNullOrWhiteSpace($existingShare)) {
+        Write-Host "  Currently configured: $existingShare" -ForegroundColor Green
+        $shareResponse = Read-Host "  Change it? (y/N)"
+    } else {
+        Write-Host "  Automount is disabled for sandbox isolation, but you can share" -ForegroundColor Yellow
+        Write-Host "  a single Windows directory into WSL." -ForegroundColor Yellow
+        Write-Host ""
+        $shareResponse = Read-Host "  Share a Windows directory? (y/N)"
+    }
+
     if ($shareResponse -eq "y" -or $shareResponse -eq "Y") {
         Write-Host ""
         Write-Host "  Enter the Windows path to share." -ForegroundColor Yellow
@@ -238,7 +263,11 @@ if ($DryRun) {
             Write-Host "  [skip] No path provided." -ForegroundColor Yellow
         }
     } else {
-        Write-Host "  [skip] No shared directory configured." -ForegroundColor Yellow
+        if (-not [string]::IsNullOrWhiteSpace($existingShare)) {
+            Write-Host "  [keep] Keeping existing shared directory." -ForegroundColor Green
+        } else {
+            Write-Host "  [skip] No shared directory configured." -ForegroundColor Yellow
+        }
     }
 }
 
@@ -387,22 +416,19 @@ echo "ro_mount=$(grep -q 'options=ro' /etc/wsl.conf 2>/dev/null && echo Y || ech
         $roMountScript = @'
 #!/bin/bash
 set -e
-# Update automount section to enabled=true with ro,metadata
-if grep -q '^\[automount\]' /etc/wsl.conf; then
-    sed -i '/^\[automount\]/,/^\[/{
-        s/^enabled=.*/enabled=true/
-        /^options=/d
-    }' /etc/wsl.conf
-    if ! sed -n '/^\[automount\]/,/^\[/p' /etc/wsl.conf | grep -q '^enabled='; then
-        sed -i '/^\[automount\]/a enabled=true' /etc/wsl.conf
-    fi
-    if ! sed -n '/^\[automount\]/,/^\[/p' /etc/wsl.conf | grep -q '^options='; then
-        sed -i '/^\[automount\]/,/^\[/{/^mountFsTab/a options=ro,metadata
-}' /etc/wsl.conf
-    fi
-else
-    printf '\n[automount]\nenabled=true\nmountFsTab=true\noptions=ro,metadata\n' >> /etc/wsl.conf
-fi
+# Idempotent automount config — use python3 to safely rewrite the INI section
+python3 -c "
+import configparser, os
+conf = configparser.ConfigParser()
+conf.read('/etc/wsl.conf')
+if not conf.has_section('automount'):
+    conf.add_section('automount')
+conf.set('automount', 'enabled', 'true')
+conf.set('automount', 'mountFsTab', 'true')
+conf.set('automount', 'options', 'ro,metadata')
+with open('/etc/wsl.conf', 'w') as f:
+    conf.write(f)
+"
 '@
         $roMountScript | Invoke-Wsl -d Ubuntu-Claude -u root -- bash -c "tr -d '\r' > /tmp/setup-ro-mount.sh"
         Invoke-Wsl -d Ubuntu-Claude -u root -- bash /tmp/setup-ro-mount.sh
@@ -511,10 +537,12 @@ $sudoersContent
 SUDOERS
 chmod 440 /etc/sudoers.d/claude-user
 
-# Add shared directory mount if configured
+# Add shared directory mount if configured (idempotent — skip if already present)
 if [[ -n "$fstabLine" ]]; then
     mkdir -p "$mountDir"
-    echo "$fstabLine" >> /etc/fstab
+    if ! grep -qF "$mountDir" /etc/fstab 2>/dev/null; then
+        echo "$fstabLine" >> /etc/fstab
+    fi
 fi
 
 # Lock the Windows user account inside this distro
@@ -608,16 +636,24 @@ if (-not $DryRun -and $ubuntuClaudeExists -and -not [string]::IsNullOrWhiteSpace
         $fstabEntry = "$SharedWinPath $SharedMountPoint drvfs ro 0 0"
         $mountScript = @"
 #!/bin/bash
+set -e
+# Remove any existing drvfs mounts and add the new one
 sed -i '/drvfs/d' /etc/fstab 2>/dev/null || true
 echo "$fstabEntry" >> /etc/fstab
 mkdir -p "$SharedMountPoint"
-if grep -q '^\[automount\]' /etc/wsl.conf; then
-    if ! grep -q 'mountFsTab' /etc/wsl.conf; then
-        sed -i '/^\[automount\]/a mountFsTab=true' /etc/wsl.conf
-    fi
-else
-    printf '\n[automount]\nmountFsTab=true\n' >> /etc/wsl.conf
-fi
+# Ensure automount section has mountFsTab=true (idempotent via python3)
+python3 -c "
+import configparser
+conf = configparser.ConfigParser()
+conf.read('/etc/wsl.conf')
+if not conf.has_section('automount'):
+    conf.add_section('automount')
+conf.set('automount', 'mountFsTab', 'true')
+if not conf.has_option('automount', 'options'):
+    conf.set('automount', 'options', 'ro,metadata')
+with open('/etc/wsl.conf', 'w') as f:
+    conf.write(f)
+"
 "@
         $mountScript | Invoke-Wsl -d Ubuntu-Claude -u root -- bash -c "tr -d '\r' > /tmp/setup-mount.sh"
         Invoke-Wsl -d Ubuntu-Claude -u root -- bash /tmp/setup-mount.sh
