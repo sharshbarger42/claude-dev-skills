@@ -328,6 +328,18 @@ The `{deploy_summary}` should reflect what happened:
 The deploy workflow failed before smoke tests could run. Check the [workflow run]({run_url}) for details.
 ```
 
+## Step 8.25: Update PR status label
+
+!`cat $HOME/.claude/development-skills/lib/pr-status-labels.md`
+
+After posting the PR comment, update the PR's status label:
+
+- **QA passed, no human verification needed** → set `pr: ready-to-merge`
+- **QA passed, human verification still needed** → keep `pr: needs-qa` (human step remaining)
+- **QA failed** → set `pr: comments-pending` (needs fixes before re-test)
+
+Use the PR status label swap procedure from pr-status-labels.md.
+
 ## Step 8.5: Post results on linked issue and update labels
 
 If a linked issue was found in Step 6.5:

@@ -206,6 +206,17 @@ After pushing, mark addressed comments as resolved on the PR:
 
 3. **Re-request review** (optional): if the review was from `code-review-agent` and changes were significant, note in the report that the user may want to re-run `/review-pr` to verify.
 
+## Step 10b: Update PR status label
+
+!`cat $HOME/.claude/development-skills/lib/pr-status-labels.md`
+
+After resolving comments, update the PR's status label:
+
+- **All `REQUEST_CHANGES` reviews dismissed** (every review comment was addressed) → set `pr: needs-qa`
+- **Some `REQUEST_CHANGES` reviews remain** (comments were skipped or deferred) → set `pr: comments-pending`
+
+Use the PR status label swap procedure from pr-status-labels.md.
+
 ## Step 11: Report
 
 **Deregister active work:** Send an Agent Mail completion message using the **Deregister Active Work** procedure from `agent-coordination.md`. Post a Discord notification. Best-effort — skip silently if unavailable.

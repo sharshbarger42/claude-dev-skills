@@ -419,9 +419,14 @@ Use `mcp__gitea__pull_request_write` with method `create`:
 
 **IMPORTANT — PR body formatting:** Pass the `body` parameter as a real multi-line string with actual newlines. Do NOT use `\n` escape sequences — the Gitea MCP tool stores them literally, producing a single-line blob of `\n` characters instead of rendered markdown. Just write the body naturally across multiple lines in the parameter value.
 
-After creating the PR, **update the status label:** replace `status: in-progress` with `status: in-review` on the issue (see status-labels.md above for the swap procedure).
+After creating the PR:
 
-**Fix mode note:** If `FIX_MODE = true`, the PR already exists — skip PR creation entirely. Instead, swap `status: in-progress` to `status: ready-to-test` and jump to Step 12.
+1. **Update the issue status label:** replace `status: in-progress` with `status: in-review` on the issue (see status-labels.md above for the swap procedure).
+2. **Apply PR status label:** set `pr: needs-review` on the PR (see pr-status-labels.md for the swap procedure).
+
+!`cat $HOME/.claude/development-skills/lib/pr-status-labels.md`
+
+**Fix mode note:** If `FIX_MODE = true`, the PR already exists — skip PR creation entirely. Instead, swap `status: in-progress` to `status: ready-to-test` on the issue, and set `pr: needs-qa` on the PR. Then jump to Step 12.
 
 **Discord notification:** Post a "PR Created" Discord notification using the purple embed template from `discord-notify.md`. Include the PR number, title, branch, and agent name. Best-effort — skip silently if webhook is not configured.
 

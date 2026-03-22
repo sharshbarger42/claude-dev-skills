@@ -180,6 +180,17 @@ Where `/tmp/review-payload.json` contains `{"body": "...", "event": "COMMENT", "
 
 **CRITICAL:** The Gitea REST API uses `new_position` for inline comment line numbers. The MCP tool uses `new_line_num`. These are different field names for the same concept — using the wrong one causes comments to silently collapse to position 0.
 
+## Step 6b: Update PR status label
+
+!`cat $HOME/.claude/development-skills/lib/pr-status-labels.md`
+
+After posting the review, update the PR's status label based on the computed verdict:
+
+- **Verdict has any `[critical]` or `[warning]` findings** → set `pr: comments-pending`
+- **Verdict `APPROVE`** (only nits or no findings) → set `pr: needs-qa`
+
+Use the PR status label swap procedure from pr-status-labels.md.
+
 ## Step 7: Report results
 
 Tell the user:
