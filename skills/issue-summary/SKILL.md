@@ -66,7 +66,8 @@ For each **feature** issue:
 3. For each feature, build:
    - Total sub-task count
    - Completed sub-task count: a sub-task is "done" if its `- [x]` checkbox is checked in the parent body, OR if the sub-task issue number does NOT appear in the open issues list (meaning it was closed). Do NOT fetch closed issues to check — simply compare against the open issue numbers already fetched.
-   - List of sub-task issue numbers
+
+**Do NOT list individual sub-tasks** — only show the count (e.g., "3/12 done"). Sub-tasks are rolled up into their parent feature's progress.
 
 ## Step 5: Build the summary
 
@@ -86,13 +87,10 @@ Present the summary in this format:
 
 ### Features ({N})
 
-| # | Title | Status | Sub-tasks | Progress |
-|---|-------|--------|-----------|----------|
-| #{index} | {title} | {status} | {completed}/{total} | {progress_bar} |
-| #{index} | {title} | {status} | — | — |
-
-{For each feature with sub-tasks, show the progress bar as a simple visual:}
-{e.g., "5/8 (62%)" or "3/3 (done)"}
+| # | Title | Status | Sub-tasks |
+|---|-------|--------|-----------|
+| #{index} | {title} | {status} | {completed}/{total} done |
+| #{index} | {title} | {status} | — |
 
 ### Bugs ({N})
 
@@ -115,12 +113,11 @@ Present the summary in this format:
 
 ### Formatting rules
 
-- **Progress bars**: Show as `{completed}/{total} ({percent}%)`. If all done, show `{total}/{total} (done)`.
+- **Sub-tasks**: Show as `{completed}/{total} done`. If all done, show `{total}/{total} done`. If no sub-tasks, show "—".
 - **Status**: Use the `status:` label value (e.g., "backlog", "in-progress"). If no status label, show "—".
 - **Priority**: Extract from `priority:` labels (e.g., "high", "medium", "low"). If none, show "—".
 - **Sort order within each section**: Sorted by priority: high > medium > low > none.
 - **Empty sections**: If a section has zero issues, omit it entirely.
-- **Features without sub-tasks**: Show "—" in the Sub-tasks and Progress columns.
 
 ## Step 6: Offer next actions
 
