@@ -181,7 +181,7 @@ To build the title:
    - `refactor` — restructuring without behavior change
    - `docs` — documentation only
    - `chore` — maintenance, deps, CI
-3. Extract the issue number from the PR branch name (`feature/{index}-*`) or PR body (`Closes #N`)
+3. Extract the issue number from the PR branch name (`feature/{index}-*` or `fix/{index}-*`) or PR body (`Closes #N`)
 4. Write a concise description (imperative mood, lowercase, no period)
 
 **Body format:** Summarize what the final PR accomplishes — NOT a list of every intermediate commit. Exclude iterative fix-up commits (e.g., "address review comments", "fix lint", "fix CI"). Focus on the end result:

@@ -80,7 +80,7 @@ one-line summary:
 dangerous commands need approval
    - Rule 3: No Claude/AI references in commits, code, or PRs
    - Rule 4: No direct pushes to main; all work via PRs
-(`feature/{ticket}-short-description`)
+(`feature/{ticket}-short-description` or `fix/{ticket}-short-description` for bugs)
    - Security Posture: Never extract or expose credentials
 3. **Post-compaction plan** — state: "If context gets compacted
 mid-session, I will re-read AGENTS.md and MEMORY.md, confirm the

@@ -69,6 +69,8 @@ Use `mcp__gitea__get_issue_by_index` with the parsed `owner`, `repo`, and `index
 
 If the issue is not found, report the error and stop.
 
+**Determine branch prefix:** Check the issue's labels. If the issue has a `bug` label, set `{branch_prefix}` to `fix`. Otherwise, set `{branch_prefix}` to `feature`. Use this prefix for all branch names throughout the workflow.
+
 ## Step 2a: Detect epic/parent issues
 
 Check whether this issue is a **parent feature issue** with sub-tasks or blockers (an "epic"). Detection criteria — the issue body contains ANY of:
@@ -318,7 +320,7 @@ If the issue has a `decision-needed` label:
 
 Check whether this issue already has implementation work and/or QA feedback:
 
-1. **Check for existing branches:** Run `git ls-remote origin "refs/heads/feature/{index}-*"` to see if a feature branch already exists for this issue.
+1. **Check for existing branches:** Run `git ls-remote origin "refs/heads/{branch_prefix}/{index}-*"` to see if a branch already exists for this issue.
 2. **Fetch issue comments:** Use `mcp__gitea__get_issue_comments` to read all comments on the issue.
 3. **Detect QA failure comments:** Look for comments that match the QA failure pattern — comments containing "QA Failed" or "Test Criteria Failures" posted by an agent or the QA skill. These indicate a previous fix attempt was rejected by QA.
 
@@ -368,7 +370,7 @@ Use worktree isolation so the main working tree stays clean:
    - EnterWorktree handles creating the worktree, switching the session's working directory, and cleanup on exit.
    - If `EnterWorktree` fails (e.g., already in a worktree), fall back to **in-place mode** below.
 4. Verify you're in the worktree with `git branch --show-current` and `pwd`
-5. Create the feature branch: `git checkout -b feature/{index}-{short-slug}`
+5. Create the branch: `git checkout -b {branch_prefix}/{index}-{short-slug}`
    - `short-slug`: lowercase, hyphenated, 3-5 words from the issue title (e.g., `add-tandoor-recipe-integration`)
 6. **Update status label:** Add `status: in-progress` to the issue and remove `status: backlog` or `status: ready-to-test` if present.
 
@@ -377,13 +379,13 @@ Use worktree isolation so the main working tree stays clean:
 1. `git fetch origin`
 2. Check for dirty working tree (`git status --porcelain`). If dirty, warn the user and ask how to proceed.
 3. `git checkout {default_branch} && git pull origin {default_branch}`
-4. Create the feature branch: `git checkout -b feature/{index}-{short-slug}`
+4. Create the branch: `git checkout -b {branch_prefix}/{index}-{short-slug}`
 
 !`cat $HOME/.claude/development-skills/lib/status-labels.md`
 
 9. **Register active work:** After setting `status: in-progress`, register via Agent Mail and post a "Started Work" Discord notification using the procedures from `agent-coordination.md` and `discord-notify.md` (loaded in Step 1b). This is best-effort — if either fails, continue.
 
-**If the feature branch already exists**, ask the user whether to continue on it or delete and recreate it.
+**If the branch already exists**, ask the user whether to continue on it or delete and recreate it.
 
 ## Step 6: Implement the changes
 
@@ -398,9 +400,9 @@ Read relevant files, write code, edit files. Do the actual implementation work h
 ## Step 7: Commit and push
 
 1. Stage changed files individually (use `git add <file1> <file2> ...`, NOT `git add -A` or `git add .`)
-2. Commit using the repo's commit format from AGENTS.md. Typical format: `feat(#{index}): short description`
+2. Commit using the repo's commit format from AGENTS.md. Typical format: `feat(#{index}): short description` (or `fix(#{index}): short description` for bug issues)
    - **IMPORTANT:** Per AGENTS.md Rule 3 — NO Claude/AI/co-authored-by references in commit messages
-3. Push the feature branch: `git push -u origin feature/{index}-{short-slug}`
+3. Push the branch: `git push -u origin {branch_prefix}/{index}-{short-slug}`
 
 The worktree will be automatically cleaned up when the session ends (you'll be prompted to keep or remove it).
 
