@@ -1,5 +1,5 @@
 ---
-name: dev-deploy
+name: deploy-dev
 description: Deploy a PR or branch to the dev environment for a repo.
 args: "[repo#PR | repo branch-name]"
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, mcp__gitea__get_pull_request_by_index, mcp__gitea__list_repo_action_runs, mcp__gitea__actions_run_write, mcp__gitea__actions_run_read, mcp__gitea__create_issue_comment
