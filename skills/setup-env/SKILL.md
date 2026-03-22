@@ -1,12 +1,26 @@
 ---
 name: setup-env
 description: Set up the Claude Code environment for the development-skills workflow — configure Gitea, Discord, AGENTS.md, and verify prerequisites. Run after setup-linux.sh or on any new machine.
-allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion
+args: "[section] [repo]"
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion, mcp__gitea__list_my_repos
 ---
 
 # Environment Setup
 
 Interactive setup for a development-skills environment. Configures Gitea access, Discord notifications, generates AGENTS.md, and verifies all prerequisites.
+
+## Targeted Mode
+
+If `$ARGUMENTS` is provided, check if it targets a specific section and/or repo:
+
+- **`/setup-env deploy`** — jump directly to deploy-config setup (Step 2h.3) for all repos
+- **`/setup-env deploy food-automation`** — jump to deploy-config setup for a single repo only (add or update that repo's row in the table)
+- **`/setup-env repos`** — jump to repos.md setup (Step 2h.1)
+- **`/setup-env infrastructure`** — jump to infrastructure.md setup (Step 2h.2)
+- **`/setup-env plugins`** — jump to plugin installation (Step 4c)
+- **No arguments** — run the full setup flow starting at Step 0
+
+When running in targeted mode, skip re-run detection (Step 0) and all unrelated steps. Go directly to the targeted section, do the work, and report results.
 
 ## Step 0: Re-run Detection
 
@@ -217,7 +231,7 @@ The productivity-hooks plugin and skills rely on config documents at `~/.config/
 
 - **`repos.md`** — shorthand table mapping repo names to owner, local paths, and descriptions. Used by `resolve-repo.md` for all skill input parsing.
 - **`infrastructure.md`** — IPs, domains, service URLs for the homelab environment. Used by `/investigate-bug`, `/qa-pr`, and injected on every prompt.
-- **`deploy-config.md`** — deploy configuration table mapping repos to deploy workflows, dev URLs, smoke endpoints, chart names, and namespaces. Used by `/qa-pr`.
+- **`deploy-config.md`** — deploy configuration table mapping repos to deploy workflows, dev URLs, chart names, and namespaces. Used by `/dev-deploy` and `/qa-pr`.
 
 These live at `~/.config/development-skills/` (preferred) or fall back to `~/.claude/development-skills/config/`.
 
@@ -286,6 +300,37 @@ mkdir -p ~/.config/development-skills/
    ```
 
 4. Tell the user they can edit `~/.config/development-skills/infrastructure.md` to add services, IPs, etc.
+
+#### deploy-config.md
+
+Deploy configuration maps repos to their deploy workflows, dev URLs, and Kubernetes resources. Used by `/dev-deploy` and `/qa-pr`.
+
+1. Check if `~/.config/development-skills/deploy-config.md` already exists. If so, show it and ask if the user wants to keep, add a repo, or regenerate.
+
+2. If generating fresh, create the file with header and any known repos. If Gitea MCP is available, list repos via `mcp__gitea__list_my_repos` and ask which ones have dev deploy workflows.
+
+3. For each repo with a deploy workflow, ask the user for:
+   - **Deploy workflow filename** (e.g., `deploy.yml`, `deploy.yaml`)
+   - **Dev health URL** (e.g., `https://food-dev.apps.superwerewolves.ninja/api/health`)
+   - **Dev base URL** (e.g., `https://food-dev.apps.superwerewolves.ninja`)
+   - **Dev chart name** (e.g., `food-automation-dev`)
+   - **Dev namespace** (e.g., `food-automation-dev`)
+   - **Dev chart version pattern** (default: `0.1.0-dev.{run_number}`)
+
+4. Write the deploy config table:
+
+   ```markdown
+   # Deploy Configuration
+
+   | Repo | Deploy workflow | Dev health URL | Dev base URL | Dev chart name | Dev namespace | Dev chart version pattern |
+   |------|----------------|----------------|--------------|----------------|---------------|--------------------------|
+   | `multi-agent-coordinator` | `deploy.yml` | `https://agents.apps.superwerewolves.ninja/api/health` | `https://agents.apps.superwerewolves.ninja` | `multi-agent-coordinator-dev` | `multi-agent-coordinator-dev` | `0.1.0-dev.{run_number}` |
+   | `food-automation` | `deploy.yaml` | `https://food-dev.apps.superwerewolves.ninja/api/health` | `https://food-dev.apps.superwerewolves.ninja` | `food-automation-dev` | `food-automation-dev` | `0.1.0-dev.{run_number}` |
+   ```
+
+5. Save to `~/.config/development-skills/deploy-config.md`.
+
+**Targeted mode (`/setup-env deploy [repo]`):** If a specific repo is provided, read the existing `deploy-config.md`, ask for that repo's deploy details, and add or update only that repo's row. Do not prompt for other repos. If the file doesn't exist yet, create it with the header and the single repo row.
 
 ### 2i. Dev Types (optional)
 
@@ -394,6 +439,7 @@ Create `~/AGENTS.md` if it doesn't exist. This is the workspace-level guide that
 | `/start` | Full workspace orientation |
 | `/do-the-thing [repo]` | Full dev loop (triage → implement → review → merge) |
 | `/do-issue repo#N` | Implement a single issue |
+| `/dev-deploy repo#N` | Deploy a PR or branch to dev |
 | `/review-pr repo#N` | Code review a PR |
 | `/gwt repo#N` | Generate acceptance criteria |
 | `/test repo#N` | Plan and run E2E tests |
@@ -484,6 +530,7 @@ Prerequisites:
   Productivity docs:
     repos.md:                {configured/missing}
     infrastructure.md:       {configured/missing}
+    deploy-config.md:        {configured/missing}
 
 Plugins:
   sound-notifications:       {installed/not installed}
