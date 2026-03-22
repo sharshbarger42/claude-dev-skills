@@ -112,23 +112,38 @@ Split comments by `user.login`:
 
 Scan the comment `body` for severity tags:
 - `[critical]` → required — treat same as user comments, must be fixed
-- `[warning]` → fix if straightforward, create issue if complex
-- `[nit]` → skip unless the fix is trivially mechanical (e.g., rename, whitespace)
+- `[warning]` → evaluate with disposition criteria below
+- `[nit]` → evaluate with disposition criteria below
 - No tag found → default to `warning` (backwards compatibility with older reviews)
 
-### Documentation comments (always fix)
+### Disposition criteria (review-agent comments only)
 
-Any comment requesting documentation updates — README changes, doc corrections, adding/updating comments, fixing docstrings, updating AGENTS.md, or similar — is **always addressed directly** in this PR regardless of severity. Documentation fixes are low-risk and fast to implement, so they should never be deferred to a separate issue. This applies to both user comments and review-agent comments at any severity level.
+After parsing severity, evaluate each review-agent `[warning]` and `[nit]` comment against these criteria **in order**. Assign the first matching disposition. User comments and `[critical]` comments always get disposition `fix`.
 
-**Threading:** Group comments that share the same `path` + `position`. When a user replies to a review-agent comment on the same path/position, the user's reply modifies or overrides the agent's suggestion — use the user's intent.
+1. **`non-issue`** — The comment is wrong, irrelevant, based on a misunderstanding of the code, or describes something that isn't actually a problem. **Action:** skip entirely — do not fix, do not create an issue. Note the specific reason it's a non-issue.
 
-For each actionable comment, extract:
+2. **`complex-out-of-scope`** — The comment identifies a real improvement, but fixing it is **genuinely complex**: requires architectural changes, new dependencies, significant refactoring, touches multiple subsystems, or work that goes well beyond the scope of this PR. **This disposition may NOT be used for easy wins** — if the fix can be done in a few lines or a single straightforward change, it must get disposition `fix` instead, even if it's tangential to the PR's purpose. **Action:** create a Gitea issue tagged `[review]` for later. Label with type and priority per the labeling procedure below.
+
+3. **`questionable-benefit`** — The comment suggests a change that is technically valid but the benefit is debatable — stylistic preferences, marginal improvements, trade-offs where reasonable people disagree. The user should decide whether it's worth doing. **Action:** create a Gitea issue tagged `[review][decision-needed]` with a brief explanation of the trade-off. Label with type `enhancement` and priority `low`. These issues are for human review, not auto-pickup.
+
+4. **`fix`** — The comment identifies a real, clear improvement that can be implemented in this PR without significant complexity. **Action:** implement the fix.
+
+**Documentation comments** are an exception: any comment requesting documentation updates (README, doc corrections, comments, docstrings, AGENTS.md, etc.) always gets disposition `fix` regardless of severity. Documentation fixes are low-risk and fast, so they should never be deferred.
+
+### Threading
+
+Group comments that share the same `path` + `position`. When a user replies to a review-agent comment on the same path/position, the user's reply modifies or overrides the agent's suggestion — use the user's intent.
+
+### Comment record
+
+For each comment, extract:
 - `path` — file to change
 - `position` — where in the file
 - `body` — what to do
 - `source` — `user` or `review-agent`
 - `severity` — `critical`, `warning`, or `nit` (user comments: always `required`)
-- `action` — what change is needed (fix code, create issue, skip, etc.)
+- `disposition` — `fix`, `non-issue`, `complex-out-of-scope`, or `questionable-benefit`
+- `disposition_reason` — one-line explanation of why this disposition was chosen (required for all non-`fix` dispositions)
 
 ## Step 5: Read repo AGENTS.md
 
@@ -140,9 +155,11 @@ If AGENTS.md doesn't exist, note that no repo-specific coding standards were fou
 
 Show the user a summary:
 - Count: **X user comments**, **Y bot critical**, **Z bot warnings**, **N bot nits**
-- Brief description of each comment and the proposed action (fix / create issue / skip)
-- Nits planned to skip (with reason: "nit — not trivially mechanical")
-- Warnings planned as issues (with reason: "complex — will create issue instead")
+- Brief description of each comment grouped by disposition:
+  - **Will fix** — comments with disposition `fix` (and all user/critical comments)
+  - **Non-issue** — comments with disposition `non-issue`, with the specific reason
+  - **Out of scope (→ issue)** — comments with disposition `complex-out-of-scope`, with why
+  - **Needs your call (→ decision issue)** — comments with disposition `questionable-benefit`, with the trade-off
 
 Use `AskUserQuestion` to get confirmation. **Do NOT start coding until the user confirms.**
 
@@ -160,14 +177,13 @@ No new branch creation — we push directly to the existing PR branch.
 
 ## Step 8: Implement the changes
 
-Read the relevant files and address comments in priority order:
+Read the relevant files and process comments by disposition:
 
-1. **User comments** (always required) — implement exactly what the user asked for
-2. **Documentation comments** (always fix) — any comment requesting doc updates (README, AGENTS.md, code comments, docstrings, etc.) is always addressed directly regardless of severity. Never create a separate issue for documentation.
-3. **Bot `[critical]`** (required) — treat same as user comments, must be fixed
-4. **Bot `[warning]`** (fix or defer) — fix if the change is straightforward. If complex (requires architectural changes, new dependencies, or significant refactoring), create a Gitea issue instead using `mcp__gitea__create_issue` with title `"[review] {brief description}"` and body referencing the PR. Label it with type and priority — see labeling procedure below.
-5. **Bot `[nit]`** (skip unless trivial) — only fix if the change is purely mechanical (rename, whitespace, typo). Skip all others
-6. **Issue creation** — for comments that explicitly say "create a ticket for X" or similar, use `mcp__gitea__create_issue`. Label it with type and priority.
+1. **disposition: `fix`** — Implement the change. This includes all user comments, all `[critical]` comments, all documentation comments, and any `[warning]`/`[nit]` comments evaluated as worth fixing.
+2. **disposition: `non-issue`** — Skip entirely. Do not fix, do not create an issue. The comment will appear in the report with the reason it was classified as a non-issue.
+3. **disposition: `complex-out-of-scope`** — Create a Gitea issue using `mcp__gitea__create_issue` with title `"[review] {brief description}"` and body referencing the PR and quoting the original comment. Label with type and priority — see labeling procedure below.
+4. **disposition: `questionable-benefit`** — Create a Gitea issue using `mcp__gitea__create_issue` with title `"[review][decision-needed] {brief description}"` and body explaining the trade-off and referencing the PR. Label with type `enhancement` and priority `low`. These issues are for human triage, not auto-pickup.
+5. **Explicit issue requests** — comments that say "create a ticket for X" or similar: use `mcp__gitea__create_issue`. Label with type and priority.
 
 ### Labeling created issues
 
@@ -221,16 +237,19 @@ Use the PR status label swap procedure from pr-status-labels.md.
 
 **Deregister active work:** Send an Agent Mail completion message using the **Deregister Active Work** procedure from `agent-coordination.md`. Post a Discord notification. Best-effort — skip silently if unavailable.
 
-Tell the user, grouped by outcome:
+Tell the user, grouped by disposition:
 
-### Addressed
+### Fixed
 - `[severity] path:line` — description (fixed in commit)
 
-### Issues Created
-- `[warning] path:line` — description → Issue #N
+### Non-issue (skipped)
+- `[severity] path:line` — description — **Reason:** {disposition_reason}
 
-### Skipped
-- `[nit] path:line` — description (not trivially mechanical)
+### Out of scope (issue created)
+- `[severity] path:line` — description → Issue #N — **Reason:** {disposition_reason}
+
+### Needs your call (decision issue created)
+- `[severity] path:line` — description → Issue #N — **Trade-off:** {disposition_reason}
 
 Also report:
 - **Reviews dismissed** — list any `REQUEST_CHANGES` reviews that were dismissed
