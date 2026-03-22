@@ -259,7 +259,7 @@ curl -sf {dev_health_url}
 
 **If the chart version or image doesn't match expectations:** Add a warning line to the comment: `⚠️ Version mismatch — expected chart {expected}, got {actual}. The deployed version may not match the PR.` Still proceed to smoke tests, but the mismatch will be visible in the audit trail.
 
-## Step 6.5: Fetch issue test criteria and triage testability
+## Step 6.5: Fetch issue test criteria
 
 If the PR body contains `Closes #N` or `Fixes #N`, extract the linked issue number and fetch it:
 
@@ -267,71 +267,55 @@ If the PR body contains `Closes #N` or `Fixes #N`, extract the linked issue numb
 2. If found, fetch the issue via `mcp__gitea__get_issue_by_index` with the parsed `owner`, `repo`, and issue `index`
 3. Parse the issue body for a `## Test Criteria` section
 4. Extract all checklist items (`- [ ] ...` and `- [x] ...`) from that section — these are the **issue test criteria**
-5. Separate them into:
-   - **Human verification** — items explicitly starting with "Human verification:" — these are the ONLY items that can be skipped
-   - **Automated criteria** — ALL other items, regardless of whether they involve frontend, backend, POST requests, data mutations, or any other operation
 
 If no linked issue is found, or the issue has no Test Criteria section, proceed with smoke tests only.
 
-### Step 6.6: Triage — identify untestable criteria
+### Test criteria labels
 
-After extracting criteria, analyze each **automated criterion** (not human verification) to determine if it is genuinely impossible for an AI agent to test, even with full access to the dev environment.
+Every test criterion in the issue MUST start with one of three labels. These labels are the **sole determinant** of how the QA skill handles that criterion — there is no AI triage or judgment call.
 
-**The dev environment exists for testing.** It is safe and expected to:
-- Make POST/PUT/DELETE requests that create, modify, or delete data
-- Trigger workflows, ingest tickets, advance tasks, etc.
-- Create test data as needed to exercise the code path under test
-- Read and verify DOM-rendered content by fetching HTML and inspecting it
-- Check API responses that reflect frontend-visible state
+| Label | Meaning | QA skill behavior |
+|-------|---------|-------------------|
+| `[ai-verify]` | Fully testable by AI via HTTP requests against the dev environment | **Execute and report pass/fail.** No exceptions — the AI must run the test. |
+| `[human-verify]` | Requires a human to verify (visual judgment, UX feel, interactive behavior) | **Skip execution.** Record as `pending`. The human will verify separately. |
+| `[human-assist]` | AI sets up the environment and tells the human what to look for | **Execute setup, then describe expected outcome.** AI creates test data, hits APIs, and records what the human should see in the browser. Recorded as `pending-human-check` until the human confirms. |
 
-A criterion is **genuinely untestable by AI** ONLY if it requires:
-- Physical human judgment (e.g., "does this look right visually?", "is the UX intuitive?")
-- Interactive multi-step browser sessions that cannot be decomposed into HTTP requests (e.g., drag-and-drop, real-time animation timing)
-- Access to systems the agent has no credentials for
+**Label rules:**
+- If a criterion has no label, treat it as `[ai-verify]` (default — the AI tests it)
+- The label must appear at the start of the criterion text, before any other content
+- Labels are assigned when the issue is created (by `/create-issues`, `/gwt`, or manually). The QA skill does NOT reassign labels — it follows them exactly.
 
-A criterion is **NOT untestable** just because it:
-- Involves POST/PUT/DELETE requests — the dev environment is meant for this
-- Mentions frontend behavior — if the behavior is driven by API data, test the API
-- Mentions DOM elements — fetch the HTML/JS and verify the rendering logic, or verify the API data that drives it
-- Would create or modify data — that's what dev is for
-- Was previously "code-verified" — code verification is not a substitute for live testing when a live dev environment is available
+### Categorize criteria by label
 
-**If any automated criteria are genuinely untestable**, ask the user before proceeding:
+Split extracted criteria into three lists:
 
-Use `AskUserQuestion` to present the untestable criteria and ask:
+1. **`ai_verify`** — criteria labeled `[ai-verify]` (or unlabeled). These MUST be executed.
+2. **`human_verify`** — criteria labeled `[human-verify]`. These are recorded as pending.
+3. **`human_assist`** — criteria labeled `[human-assist]`. The AI sets up the environment and documents what the human should see.
 
-```
-These test criteria appear to require human judgment and cannot be verified by automated testing:
+### Step 6.7: Plan test execution
 
-1. "{criterion text}" — {reason it's untestable}
-2. ...
-
-Should I add "Human verification:" prefix to these criteria in the issue (making them human-only), or should I attempt to test them anyway?
-```
-
-Options:
-- **Mark as human-only** — update the issue body to prefix these with "Human verification:" and treat them as pending human signoff
-- **Test anyway** — attempt the best possible automated verification (may produce imprecise results)
-
-If ALL automated criteria are testable (the common case), skip this question entirely and proceed to Step 7.
-
-### Step 6.7: Plan test execution for each criterion
-
-For each automated criterion, plan HOW to test it against the live dev environment:
+For each `[ai-verify]` and `[human-assist]` criterion, plan HOW to test it against the live dev environment:
 
 1. **Read the criterion carefully** — understand what state or behavior it's verifying
 2. **Identify prerequisite actions** — does the test require creating data first? (e.g., POST to ingest a ticket before checking its state)
 3. **Identify the verification request** — what HTTP request proves the criterion? (e.g., GET the task and check `state` field)
 4. **Plan the sequence** — prerequisite actions first, then verification
-5. **Record the plan** for execution in Step 7
+5. **For `[human-assist]`** — additionally plan what the human should observe in the browser after the AI sets up the state
+
+**The dev environment exists for testing.** It is safe and expected to:
+- Make POST/PUT/DELETE requests that create, modify, or delete data
+- Trigger workflows, ingest tickets, advance tasks, etc.
+- Create test data as needed to exercise the code path under test
+- Check API responses that reflect frontend-visible state
 
 Example plans:
-- Criterion: `POST /support-tickets/ingest response includes "state": "coding"`
+- `[ai-verify]` criterion: `POST /support-tickets/ingest response includes "state": "coding"`
   → Plan: POST to `/support-tickets/ingest` with test payload, check response JSON for `state: "coding"`
-- Criterion: `Task card on Kanban board shows in "coding" column`
-  → Plan: After ingesting a test ticket, GET `/api/tasks` and verify the task appears in the `coding` array (the Kanban board renders from this API response)
-- Criterion: `selectTask(taskId) shows state: "coding" in detail panel`
-  → Plan: GET `/api/tasks/{id}` for the test task and verify `state: "coding"` (the detail panel renders from this API response)
+- `[ai-verify]` criterion: `Task in coding column via API`
+  → Plan: After ingesting a test ticket, GET `/api/tasks` and verify the task appears in the `coding` array
+- `[human-assist]` criterion: `Task detail panel shows warning indicator for stuck task`
+  → Plan: Create a stuck task via API (POST task, advance to coding, clear assigned_slot). Then tell the human: "Open the dashboard, click on task {id}. You should see: (1) a warning badge on the Kanban card, (2) 'none' in orange/red text for assigned_agent in the detail panel."
 
 ## Step 7: Run smoke tests
 
@@ -372,32 +356,59 @@ Run ALL smoke endpoints from the deploy config table (Step 3) against `{dev_base
 
 ### Issue test criteria (from Step 6.5)
 
-After running smoke tests, execute each **automated criterion** from the issue's Test Criteria section against the live dev environment. Follow the test execution plan from Step 6.7.
+After running smoke tests, execute the issue test criteria by label. Follow the test execution plan from Step 6.7.
 
-**Execution rules:**
+#### `[ai-verify]` criteria — execute and report
 
-1. **Execute every automated criterion live.** There is no "skip" option for automated criteria. The dev environment exists for testing — use it.
-2. **Create test data if needed.** If a criterion requires specific state (e.g., a task in "coding" state), create that state by making the appropriate API calls (POST to ingest, advance, etc.) before verifying.
-3. **Test the API that drives the UI.** Frontend criteria that mention DOM elements, Kanban columns, or detail panels are testing that the API returns correct data. The frontend renders from API responses — verify the API response contains the expected values.
-4. **Mark the criterion source as `issue`** (vs `smoke` for the default tests).
-5. **Human verification criteria are NOT executed** — they are included in the results table as `PENDING` with a note that human signoff is required. These are the ONLY criteria that can be pending.
+1. **Execute every `[ai-verify]` criterion live.** There is no "skip" option. The dev environment exists for testing — use it.
+2. **Create test data if needed.** If a criterion requires specific state (e.g., a task in "coding" state), create that state by making the appropriate API calls before verifying.
+3. **Test the API that drives the UI.** Frontend criteria that mention DOM elements, Kanban columns, or detail panels are testing that the API returns correct data. Verify the API response contains the expected values.
+4. **Mark the criterion source as `issue`** and label as `ai-verify`.
+5. **There is no "skipped" status.** Every `[ai-verify]` criterion must be either `passed` or `failed`. Infrastructure issues (endpoint down, 500 error) = `failed`.
 
-**There is no "skipped" status for automated criteria.** Every non-human criterion must be either `passed` or `failed`. If a test can't be executed due to an infrastructure issue (e.g., endpoint down, 500 error), that's a `failed` test, not a skipped one.
+#### `[human-assist]` criteria — set up environment, then describe
+
+1. **Execute all setup steps** — create test data, make API calls, put the system into the state the criterion requires. This is AI work.
+2. **Verify the API state** — confirm via API that the setup succeeded (e.g., the task exists, it's in the right state, the endpoint returns expected data).
+3. **Document what the human should see** — write a clear, specific description of:
+   - What URL to open in the browser
+   - What to click or navigate to
+   - What they should see (specific text, colors, indicators, layout)
+   - What would indicate failure
+4. **Record the result as `pending-human-check`** with the setup status (succeeded/failed) and the human instructions.
+5. If the **setup itself fails** (API errors, can't create test data), record as `failed` — the AI part didn't work.
+
+Example result for `[human-assist]`:
+```
+{
+  "name": "Stuck task shows warning indicator on Kanban card",
+  "label": "human-assist",
+  "setup_status": "succeeded",
+  "setup_detail": "Created task dd-test-1 in CODING state with empty assigned_slot via POST /api/tasks. Task has been in this state for >60s. API confirms: GET /api/action-required returns item with source:'stuck', task_id:'dd-test-1'.",
+  "human_instructions": "Open https://dev-agents.apps.superwerewolves.ninja in browser. Look at the Kanban board 'coding' column. Task 'dd-test-1' should show: (1) a warning badge or icon indicating no assigned agent, (2) orange/red 'none' text for assigned_agent in the detail panel when clicked.",
+  "passed": "pending-human-check"
+}
+```
+
+#### `[human-verify]` criteria — record as pending
+
+These are NOT executed. Record each as `pending` with a note that human signoff is required. The human will verify these independently.
 
 ### Collecting results
 
-Build a results list. The `passed` field has three possible values:
-- `true` — test executed and passed
-- `false` — test executed and failed
-- `"pending"` — human verification criterion (never executed — the ONLY type that can be non-pass/fail)
+Build a results list. The `passed` field has four possible values:
+- `true` — test executed and passed (smoke tests + `[ai-verify]`)
+- `false` — test executed and failed (smoke tests + `[ai-verify]` + `[human-assist]` setup failure)
+- `"pending-human-check"` — `[human-assist]` criterion where AI setup succeeded, awaiting human confirmation
+- `"pending"` — `[human-verify]` criterion (never executed)
 
 ```
 [
-  { "name": "Health check", "source": "smoke", "endpoint": "/api/health", "status": 200, "passed": true, "detail": "" },
-  { "name": "Task list", "source": "smoke", "endpoint": "/api/tasks", "status": 500, "passed": false, "detail": "Internal server error: database locked" },
-  { "name": "POST /ingest returns state: coding", "source": "issue", "endpoint": "/support-tickets/ingest", "status": 200, "passed": true, "detail": "Response contains state: coding" },
-  { "name": "Task in coding column via API", "source": "issue", "endpoint": "/api/tasks", "status": 200, "passed": true, "detail": "Task bd-xxx found in tasks.coding array" },
-  { "name": "Human verification", "source": "issue", "endpoint": "-", "status": "-", "passed": "pending", "detail": "Owner confirms fix works" },
+  { "name": "Health check", "source": "smoke", "label": "smoke", "endpoint": "/api/health", "status": 200, "passed": true, "detail": "" },
+  { "name": "Task list", "source": "smoke", "label": "smoke", "endpoint": "/api/tasks", "status": 500, "passed": false, "detail": "Internal server error: database locked" },
+  { "name": "Stuck task in action-required", "source": "issue", "label": "ai-verify", "endpoint": "/api/action-required", "status": 200, "passed": true, "detail": "Created stuck task, confirmed in action-required with source:'stuck'" },
+  { "name": "Warning indicator on stuck task card", "source": "issue", "label": "human-assist", "endpoint": "-", "status": "-", "passed": "pending-human-check", "detail": "Setup: created stuck task dd-test-1. Human: open dashboard, check coding column for warning badge." },
+  { "name": "Human verification: UX feels intuitive", "source": "issue", "label": "human-verify", "endpoint": "-", "status": "-", "passed": "pending", "detail": "Owner confirms fix works" },
   ...
 ]
 ```
@@ -408,30 +419,12 @@ Compose and post a PR comment using `mcp__gitea__create_issue_comment` with the 
 
 ### Compute overall verdict
 
-The verdict is determined by ALL results (smoke tests + issue criteria):
+The verdict is determined by smoke tests + `[ai-verify]` criteria only. `[human-assist]` and `[human-verify]` criteria do not block the verdict — they are reported separately.
 
-- **QA Passed** — every automated test passed. Human verification criteria may still be pending but do not block the verdict.
-- **QA Failed** — one or more automated tests failed (returned wrong status, error, unexpected data, etc.)
+- **QA Passed** — every smoke test and `[ai-verify]` criterion passed. `[human-assist]` setups succeeded (but human confirmation still needed). Ready for merge pending human checks.
+- **QA Failed** — one or more smoke tests or `[ai-verify]` criteria failed, OR a `[human-assist]` setup failed (AI couldn't create the test conditions).
 
-There is no "Partial" verdict. Every automated criterion is either tested and passed, or tested and failed. The only items that can remain unresolved are human verification criteria (marked as `pending`).
-
-### If ALL tests passed (no skipped, no failed)
-
-```markdown
-✅ **QA Passed** — dev deployment verified
-
-**Branch:** `{head_branch}` ({head_sha_short})
-**Deploy:** {deploy_summary}
-**Environment:** dev
-
-| Test | Endpoint | Status | Result |
-|------|----------|--------|--------|
-| Health check | `/api/health` | 200 | ✅ Pass |
-| Task list | `/api/tasks` | 200 | ✅ Pass |
-| ... | ... | ... | ... |
-
-All {N} tests passed. Ready for merge.
-```
+There is no "Partial" or "Skipped" verdict. Every `[ai-verify]` criterion is either tested and passed, or tested and failed.
 
 ### Deploy summary line
 
@@ -440,7 +433,52 @@ The `{deploy_summary}` should reflect what happened:
 - Chart existed, Flux waited: `Skipped build (chart from run #{existing_run_number}), waited for Flux rollout`
 - Chart already deployed: `Skipped deploy (chart 0.1.0-dev.{run_number} already deployed)`
 
-### If ANY tests failed
+### If ALL automated tests passed
+
+```markdown
+✅ **QA Passed** — dev deployment verified
+
+**Branch:** `{head_branch}` ({head_sha_short})
+**Deploy:** {deploy_summary}
+**Environment:** dev
+
+### Smoke Tests
+
+| Test | Endpoint | Status | Result |
+|------|----------|--------|--------|
+| Health check | `/api/health` | 200 | ✅ Pass |
+| Task list | `/api/tasks` | 200 | ✅ Pass |
+| ... | ... | ... | ... |
+
+### `[ai-verify]` — Automated Criteria
+
+| Criterion | Endpoint | Status | Result |
+|-----------|----------|--------|--------|
+| {criterion} | {endpoint} | {status} | ✅ Pass |
+| ... | ... | ... | ... |
+
+### `[human-assist]` — Environment Prepared, Awaiting Human Check
+
+{For each human-assist criterion, render a block like this:}
+
+**{criterion text}**
+> **Setup:** {what the AI did — API calls, test data created, current state}
+> **What to check:** {URL to open, what to look for, what indicates pass vs fail}
+> **Setup status:** ✅ Succeeded
+
+### `[human-verify]` — Awaiting Human Signoff
+
+| Criterion | Status |
+|-----------|--------|
+| {criterion text} | ⏳ Pending |
+| ... | ... |
+
+---
+
+All {ai_count} automated tests passed. {human_assist_count} criteria ready for human spot-check. {human_verify_count} criteria awaiting human signoff.
+```
+
+### If ANY automated tests failed
 
 ```markdown
 ❌ **QA Failed** — dev deployment has issues
@@ -449,22 +487,41 @@ The `{deploy_summary}` should reflect what happened:
 **Deploy:** {deploy_summary}
 **Environment:** dev
 
+### Smoke Tests
+
 | Test | Endpoint | Status | Result |
 |------|----------|--------|--------|
 | Health check | `/api/health` | 200 | ✅ Pass |
 | Task list | `/api/tasks` | 500 | ❌ Fail |
 | ... | ... | ... | ... |
 
+### `[ai-verify]` — Automated Criteria
+
+| Criterion | Endpoint | Status | Result |
+|-----------|----------|--------|--------|
+| {criterion} | {endpoint} | {status} | ✅ Pass / ❌ Fail |
+| ... | ... | ... | ... |
+
 ### Failures
 
-**Task list** (`/api/tasks`) — HTTP 500
+**{test name}** (`{endpoint}`) — HTTP {status}
 ```
 {truncated response body or error message}
 ```
 
-**{other failures...}**
+### `[human-assist]` — Environment Prepared, Awaiting Human Check
 
-{passed_count}/{total_count} tests passed. See failures above for details.
+{Same format as above — still render these even on failure, so the human can check}
+
+### `[human-verify]` — Awaiting Human Signoff
+
+| Criterion | Status |
+|-----------|--------|
+| {criterion text} | ⏳ Pending |
+
+---
+
+{passed_count}/{total_count} automated tests passed. See failures above for details.
 ```
 
 ### If deploy itself failed
@@ -485,8 +542,8 @@ The deploy workflow failed before smoke tests could run. Check the [workflow run
 
 After posting the PR comment, update the PR's status label:
 
-- **QA passed, no human verification pending** → set `pr: ready-to-merge`
-- **QA passed, human verification still pending** → keep `pr: needs-qa` (human step remaining)
+- **QA passed, no `[human-assist]` or `[human-verify]` criteria** → set `pr: ready-to-merge`
+- **QA passed, but `[human-assist]` or `[human-verify]` criteria pending** → keep `pr: needs-qa` (human steps remaining)
 - **QA failed** → set `pr: comments-pending` (needs fixes before re-test)
 
 Use the PR status label swap procedure from pr-status-labels.md.
@@ -495,14 +552,16 @@ Use the PR status label swap procedure from pr-status-labels.md.
 
 If a linked issue was found in Step 6.5:
 
-### If any automated test criteria FAILED:
+### If any `[ai-verify]` criteria or smoke tests FAILED:
 
 1. Post a comment on the **issue** (not just the PR) using `mcp__gitea__create_issue_comment`:
 
 ```markdown
 ❌ **QA Failed** — Test Criteria Failures
 
-PR #{pr_number} was deployed to dev and tested. The following test criteria from this issue failed:
+PR #{pr_number} was deployed to dev and tested.
+
+### `[ai-verify]` Results
 
 | Criterion | Result | Detail |
 |-----------|--------|--------|
@@ -510,27 +569,45 @@ PR #{pr_number} was deployed to dev and tested. The following test criteria from
 | {criterion text} | ✅ Pass | |
 | ... | ... | ... |
 
-{failed_count}/{automated_count} automated criteria failed. The fix needs to address these failures before retesting.
+{failed_count}/{ai_verify_count} `[ai-verify]` criteria failed. The fix needs to address these failures before retesting.
 ```
 
 2. **Update issue label:** Swap `status: ready-to-test` or `status: in-review` to `status: in-progress` (signals that `/do-issue` should pick this up and fix the failures)
 
-### If all automated test criteria PASSED (none failed, none skipped):
+### If all `[ai-verify]` criteria PASSED:
 
 1. Post a comment on the **issue**:
 
 ```markdown
 ✅ **QA Passed** — Automated Test Criteria Verified
 
-PR #{pr_number} was deployed to dev. All automated test criteria passed:
+PR #{pr_number} was deployed to dev. All `[ai-verify]` criteria passed.
+
+### `[ai-verify]` Results
 
 | Criterion | Result |
 |-----------|--------|
 | {criterion text} | ✅ Pass |
 | ... | ... |
-| Human verification: {description} | ⏳ Pending |
 
-All {automated_count} automated criteria passed. **Human verification still required** — this issue needs manual signoff before it can be closed.
+### `[human-assist]` — Ready for Human Spot-Check
+
+{For each human-assist criterion:}
+
+**{criterion text}**
+> **Setup:** {what the AI did}
+> **What to check:** {instructions for the human}
+> **Setup status:** ✅ Succeeded / ❌ Failed
+
+### `[human-verify]` — Awaiting Human Signoff
+
+| Criterion | Status |
+|-----------|--------|
+| {criterion text} | ⏳ Pending |
+
+---
+
+All {ai_verify_count} `[ai-verify]` criteria passed. {human_assist_count} `[human-assist]` criteria ready for human spot-check. {human_verify_count} `[human-verify]` criteria awaiting signoff.
 ```
 
 2. **Update issue label:** Swap current status to `status: in-review` (signals that human verification is the remaining gate)
@@ -541,18 +618,18 @@ All {automated_count} automated criteria passed. **Human verification still requ
 After posting the issue comment, update the **issue body** to check off test criteria that passed during QA:
 
 1. Fetch the current issue body via `mcp__gitea__get_issue_by_index`
-2. For each automated criterion that **passed** (`passed: true`, actually executed and verified):
+2. For each `[ai-verify]` criterion that **passed** (`passed: true`, actually executed and verified):
    - Find the matching `- [ ]` line in the issue body
    - Replace `- [ ]` with `- [x]`
-   - Append a brief annotation: ` — *{verification_method} in PR #{pr_number}*`
-     - `verification_method` is one of: `verified live`, `code-verified`, `smoke-tested`
-3. For criteria that **failed**, leave them as `- [ ]` (unchecked)
-4. For **human verification** criteria, always leave as `- [ ]`
+   - Append a brief annotation: ` — *verified live in PR #{pr_number}*`
+3. For `[ai-verify]` criteria that **failed**, leave them as `- [ ]` (unchecked)
+4. For `[human-assist]` criteria where setup succeeded, leave as `- [ ]` but append: ` — *environment prepared in PR #{pr_number}, awaiting human check*`
+5. For `[human-verify]` criteria, always leave as `- [ ]`
 6. Use `mcp__gitea__issue_write` with `method: "update"` to save the updated body
 
 **Important:** Only modify the `- [ ]` / `- [x]` checkboxes and append annotations. Do not alter any other part of the issue body.
 
-**CRITICAL:** Never mark a criterion as `[x]` unless it was actually executed and returned a passing result (`passed: true`). Criteria with `passed: "pending"` (human verification) must remain unchecked.
+**CRITICAL:** Never mark a criterion as `[x]` unless it was actually executed and returned a passing result (`passed: true`). Only `[ai-verify]` criteria can be checked off. `[human-assist]` and `[human-verify]` criteria must remain unchecked until a human confirms them.
 
 ### If no linked issue:
 
@@ -562,8 +639,13 @@ Skip this step entirely — only post the PR comment from Step 8.
 
 After posting the PR comment, tell the user:
 1. Whether QA passed or failed
-2. How many tests passed/failed (split by smoke tests vs issue test criteria)
+2. Breakdown by label type:
+   - **Smoke tests:** {passed}/{total}
+   - **`[ai-verify]`:** {passed}/{total}
+   - **`[human-assist]`:** {setup_succeeded}/{total} ready for human spot-check
+   - **`[human-verify]`:** {count} pending human signoff
 3. Link to the PR comment
 4. If a linked issue was found: link to the issue comment and current label status
 5. If failed, a brief summary of what broke
-6. If passed, remind that human verification is still pending (if applicable)
+6. If `[human-assist]` criteria exist, remind the user to check them — they have instructions in the PR/issue comments
+7. If `[human-verify]` criteria exist, remind that human signoff is needed before merge
