@@ -21,11 +21,11 @@ Extract `owner` and `repo` from the argument.
 
 !`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
 
-## Step 2: Fetch all issues
+## Step 2: Fetch open issues
 
 Use `mcp__gitea__list_issues` with `state: "open"` to get all open issues. Paginate (increment `page`) until all are fetched.
 
-Then fetch closed issues with `state: "closed"`. Paginate until all are fetched.
+**Do NOT fetch closed issues.** This skill focuses on active/remaining work only.
 
 For each issue, collect: `number`, `title`, `body`, `labels`, `state`, `milestone`.
 
@@ -47,8 +47,7 @@ Classify each issue by its labels:
 - **In Progress**: has `status: in-progress` label
 - **In Review**: has `status: in-review` label
 - **Ready to Test**: has `status: ready-to-test` label
-- **Done**: has `status: done` label OR issue state is `closed`
-- **No status**: no `status:` label and issue is open
+- **No status**: no `status:` label
 
 ### Special flags
 - **Decision Needed**: has `decision-needed` label
@@ -56,7 +55,7 @@ Classify each issue by its labels:
 
 ## Step 4: Identify features and their sub-tasks
 
-For each **feature** issue (open or closed):
+For each **feature** issue:
 
 1. **Check the issue body** for sub-task references:
    - Checklist items with issue references: `- [ ] #N` or `- [x] #N`
@@ -66,7 +65,7 @@ For each **feature** issue (open or closed):
 
 3. For each feature, build:
    - Total sub-task count
-   - Completed sub-task count (closed issues or `- [x]` checked items)
+   - Completed sub-task count: a sub-task is "done" if its `- [x]` checkbox is checked in the parent body, OR if the sub-task issue number does NOT appear in the open issues list (meaning it was closed). Do NOT fetch closed issues to check — simply compare against the open issue numbers already fetched.
    - List of sub-task issue numbers
 
 ## Step 5: Build the summary
@@ -80,13 +79,12 @@ Present the summary in this format:
 | Metric | Count |
 |--------|-------|
 | Total open issues | {N} |
-| Total closed issues | {N} |
 | Ready to work (backlog) | {N} |
 | In progress | {N} |
 | In review | {N} |
 | Awaiting decision | {N} |
 
-### Features ({N} total, {M} open)
+### Features ({N})
 
 | # | Title | Status | Sub-tasks | Progress |
 |---|-------|--------|-----------|----------|
@@ -96,19 +94,19 @@ Present the summary in this format:
 {For each feature with sub-tasks, show the progress bar as a simple visual:}
 {e.g., "5/8 (62%)" or "3/3 (done)"}
 
-### Bugs ({N} total, {M} open)
+### Bugs ({N})
 
 | # | Title | Status | Priority |
 |---|-------|--------|----------|
 | #{index} | {title} | {status} | {priority label or "—"} |
 
-### Enhancements ({N} total, {M} open)
+### Enhancements ({N})
 
 | # | Title | Status | Priority |
 |---|-------|--------|----------|
 | #{index} | {title} | {status} | {priority label or "—"} |
 
-### Other Issues ({N} total, {M} open)
+### Other Issues ({N})
 
 | # | Title | Status |
 |---|-------|--------|
@@ -118,9 +116,9 @@ Present the summary in this format:
 ### Formatting rules
 
 - **Progress bars**: Show as `{completed}/{total} ({percent}%)`. If all done, show `{total}/{total} (done)`.
-- **Status**: Use the `status:` label value (e.g., "backlog", "in-progress"). If closed, show "done". If no status label, show "—".
+- **Status**: Use the `status:` label value (e.g., "backlog", "in-progress"). If no status label, show "—".
 - **Priority**: Extract from `priority:` labels (e.g., "high", "medium", "low"). If none, show "—".
-- **Sort order within each section**: Open issues first (sorted by priority: high > medium > low > none), then closed issues.
+- **Sort order within each section**: Sorted by priority: high > medium > low > none.
 - **Empty sections**: If a section has zero issues, omit it entirely.
 - **Features without sub-tasks**: Show "—" in the Sub-tasks and Progress columns.
 
