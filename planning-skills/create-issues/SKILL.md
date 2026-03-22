@@ -1,22 +1,40 @@
 ---
 name: create-issues
-description: Turn a project plan into Gitea milestones, vertically-sliced feature issues, and AI-ready sub-issues with dependency tracking.
-args: "<plan-dir> [owner/repo]"
+description: Turn a project plan into Gitea milestones, vertically-sliced feature issues, and AI-ready sub-issues with dependency tracking. Can also break down an existing issue into sub-issues.
+args: "<plan-dir|issue-ref> [owner/repo]"
 ---
 
 # Create Issues Skill
 
-Transform a project plan into a structured set of Gitea milestones, feature issues, and sub-issues ready for parallel AI execution.
+Transform a project plan into a structured set of Gitea milestones, feature issues, and sub-issues ready for parallel AI execution. Can also decompose an existing Gitea issue into sub-issues.
 
-**Input:** Two arguments:
+**Input:** Two modes based on the first argument:
+
+**Mode A — From plan directory:**
 1. Path to the plan directory (containing `plan.md` from `/plan-project`) — **required**
 2. Target `owner/repo` or shorthand — **optional** (will ask if not provided)
+
+**Mode B — From existing issue:**
+1. Issue reference (`repo#N`, `owner/repo#N`, or full URL) — **required**
+2. No second argument needed (repo is derived from the issue reference)
 
 !`cat $HOME/.claude/development-skills/lib/planning-common.md`
 
 ### Repo resolution
 
 !`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
+
+## Mode Detection
+
+Determine which mode to use based on the first argument:
+
+- If the argument contains `#` or is a URL with `/issues/` → **Mode B** (existing issue)
+- If the argument is a file path or directory → **Mode A** (plan directory)
+- If ambiguous, ask the user
+
+---
+
+# Mode A: From Plan Directory
 
 ## Step 1: Read the plan
 
@@ -389,4 +407,185 @@ Report to the user:
 - #{N} {title} ← waiting on #{contract_issue}
 
 **Issue map saved to:** {plan_dir}/issues-created.md
+```
+
+---
+
+# Mode B: Break Down Existing Issue
+
+Use this mode when given an issue reference (e.g., `multi-agent-system#235` or `food-automation#42`). Reads the issue, understands its scope, and creates sub-issues for it.
+
+## Step B1: Parse the issue reference
+
+Extract `owner`, `repo`, and issue `index` from the argument using the repo resolution logic above.
+
+## Step B2: Fetch issue metadata
+
+Use `mcp__gitea__issue_read` (or `get_issue_by_index`) with the parsed `owner`, `repo`, and `index` to get:
+- Issue title
+- Issue body/description
+- Labels
+- Milestone
+- Comments (for additional context)
+
+If the issue is not found, report the error and stop.
+
+Also fetch `AGENTS.md` from the repo's default branch for coding standards context.
+
+## Step B3: Read the codebase for context
+
+To create accurate sub-issues, understand what already exists:
+
+1. Read the repo's directory structure (use `mcp__gitea__get_dir_contents` or local `ls`)
+2. If the issue references specific files, APIs, or components, read those files
+3. Identify the architectural patterns in use (file naming, module structure, test patterns)
+
+This context ensures sub-issues reference real file paths and follow existing patterns.
+
+## Step B4: Add `feature` label to parent issue
+
+The parent issue becomes the feature issue. Add the `feature` label to it:
+
+1. Call `mcp__gitea__list_repo_labels` to find the `feature` label ID
+2. If a `feature` label exists, add it with `mcp__gitea__add_issue_labels`
+3. If no `feature` label exists, create it with `mcp__gitea__create_label`:
+   - `name`: `feature`
+   - `color`: `#0075ca` (blue)
+   - Then add it to the issue
+
+## Step B5: Analyze and propose sub-issues
+
+Break the issue down into sub-issues following the same sizing rules as Mode A Step 8:
+
+- Each sub-issue should touch 1-3 files maximum
+- Each should be completable in roughly 30-60 minutes of focused work
+- Each should be independently testable
+- Parallel-safe where possible
+
+Analyze the issue body for:
+- Distinct deliverables or checklist items
+- Separable components (backend vs frontend, model vs API vs UI)
+- Natural ordering (schema first, then API, then UI)
+- Test tasks that can run in parallel with implementation
+
+Present the proposed breakdown to the user with `AskUserQuestion`:
+
+```
+## Breaking down #{index}: {title}
+
+I'll create {N} sub-issues:
+
+| # | Sub-issue | Files | Depends on | Status |
+|---|-----------|-------|------------|--------|
+| 1 | {task description} | {file1}, {file2} | — | ✅ ready |
+| 2 | {task description} | {file3} | — | ✅ ready |
+| 3 | {task description} | {file4}, {file5} | #1 | 🔒 after #1 |
+| 4 | {task description (tests)} | {test_file} | #1, #2 | 🔒 after #1, #2 |
+
+### Parallel work opportunities
+- Sub-issues 1 and 2 can be worked on simultaneously
+- Sub-issue 3 must wait for #1
+- Sub-issue 4 (tests) can start after #1 and #2
+
+Proceed with creating these sub-issues?
+```
+
+Options:
+- **Yes, create all** (Recommended)
+- **Adjust breakdown** (free text — add, remove, or modify sub-issues)
+
+## Step B6: Create sub-issues
+
+For each confirmed sub-issue, create a Gitea issue:
+
+Use `mcp__gitea__issue_write` with `method: "create"`:
+- `title`: `sub: {specific task}` (e.g., `sub: create TypeScript types matching backend models`)
+- `body`:
+```markdown
+## Parent
+
+Sub-issue of #{parent_issue_number} — {parent title}
+
+## Task
+
+{Clear, specific description of exactly what to implement — 3-5 sentences}
+
+## Files to create/modify
+
+- `{file_path}` — {what to do in this file}
+- `{file_path}` — {what to do in this file}
+
+## Technical details
+
+- {specific implementation approach from codebase analysis}
+- {library/function to use}
+- {existing patterns to follow — reference actual files in the repo}
+
+## Dependencies
+
+{If this sub-issue must be done after another sub-issue:}
+- Depends on #{other_sub_issue} — {why, what it provides}
+
+{If this sub-issue can be done in parallel:}
+- No blockers — can be started immediately
+
+## Acceptance criteria
+
+- [ ] {specific, testable criterion}
+- [ ] {specific, testable criterion}
+- [ ] All existing tests still pass
+```
+- `milestone`: same milestone as the parent issue (if it has one)
+- `labels`: `sub-issue` plus the sub-issue type (`implementation`, `test`, `config`, or `docs`)
+
+## Step B7: Update parent issue
+
+After creating all sub-issues, update the parent issue body to include a task list linking to all sub-issues:
+
+Use `mcp__gitea__issue_write` with `method: "add_comment"` to add a comment (do NOT overwrite the original body):
+
+```markdown
+## Sub-issues
+
+This feature has been broken down into the following sub-issues:
+
+- [ ] #{N} — {sub-issue title}
+- [ ] #{N} — {sub-issue title}
+- [ ] #{N} — {sub-issue title}
+- [ ] #{N} — {sub-issue title}
+
+### Parallel work opportunities
+- {which sub-issues can be done simultaneously}
+- {which must be sequential and why}
+
+### Suggested order
+1. #{N} — {title} (no dependencies, start here)
+2. #{N} — {title} (no dependencies, parallel with #1)
+3. #{N} — {title} (after #1)
+4. #{N} — {title} (after #1 and #2)
+```
+
+## Step B8: Report
+
+Report to the user:
+
+```
+## Issue Breakdown Complete
+
+**Parent:** #{parent_index} — {parent_title}
+**Repo:** {owner}/{repo}
+**Sub-issues created:** {count}
+**Label added:** `feature` on #{parent_index}
+
+### Sub-issues
+
+| # | Title | Depends on | Status |
+|---|-------|------------|--------|
+| #{N} | {title} | — | ✅ ready |
+| #{N} | {title} | — | ✅ ready |
+| #{N} | {title} | #{N} | 🔒 blocked |
+
+### Ready to start
+> `/do-issue {repo}#{first_ready_sub}` — {title}
+> `/do-issue {repo}#{next_ready_sub}` — {title}
 ```
