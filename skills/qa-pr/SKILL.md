@@ -184,6 +184,80 @@ Flux CD picks up new Helm chart versions from the OCI registry. After a chart is
 
 **Note:** Flux polls every 30 minutes, so this step may take a while. If the health endpoint was already healthy before the deploy (from a previous deployment), the smoke tests in Step 7 are the real validation — the health check here is just a gate to ensure the service is reachable.
 
+## Step 5: Verify deployment and post evidence
+
+After the deploy path completes (whether full deploy, skip-build, or skip-entirely), verify that the correct version is running on dev and post a PR comment with the evidence. This creates an auditable record of what was actually deployed and tested.
+
+### Gather verification evidence
+
+Run these checks and record the results:
+
+1. **HelmRelease version** (if kubeconfig available):
+   ```bash
+   kubectl --kubeconfig=$HOME/.kube/qa-readonly-kubeconfig \
+     get helmrelease {dev_chart_name} -n {dev_namespace} \
+     -o jsonpath='{.status.lastAppliedRevision}' 2>/dev/null
+   ```
+   Record the chart version (e.g., `0.1.0-dev.205`).
+
+2. **Pod image SHA** (if kubeconfig available):
+   ```bash
+   kubectl --kubeconfig=$HOME/.kube/qa-readonly-kubeconfig \
+     get pods -n {dev_namespace} -o jsonpath='{.items[0].spec.containers[0].image}' 2>/dev/null
+   ```
+   Record the full image reference (includes tag or SHA).
+
+3. **Health endpoint response**:
+   ```bash
+   curl -sf {dev_health_url}
+   ```
+   Record the full JSON response (includes version/commit info if the service exposes it).
+
+4. **Expected values from the deploy**:
+   - PR head SHA: `{head_sha}`
+   - Chart version (from Step 3.6 or 4b): `{chart_version}`
+   - Deploy workflow run number (if applicable): `#{run_number}`
+
+### Post deployment verification comment
+
+Post a PR comment using `mcp__gitea__create_issue_comment` with the evidence:
+
+```markdown
+🔍 **Deploy Verification** — confirmed on dev
+
+| Check | Value |
+|-------|-------|
+| PR head SHA | `{head_sha_short}` |
+| Chart version | `{chart_version}` |
+| HelmRelease applied | `{helmrelease_version}` |
+| Pod image | `{pod_image}` |
+| Health endpoint | `{health_status}` (HTTP {status_code}) |
+| Deploy path | {deploy_path — "full deploy", "existing chart", or "already deployed"} |
+
+<details>
+<summary>Verification commands</summary>
+
+```
+# HelmRelease version
+kubectl --kubeconfig=~/.kube/qa-readonly-kubeconfig get helmrelease {dev_chart_name} -n {dev_namespace} -o jsonpath='{.status.lastAppliedRevision}'
+→ {helmrelease_version}
+
+# Pod image
+kubectl --kubeconfig=~/.kube/qa-readonly-kubeconfig get pods -n {dev_namespace} -o jsonpath='{.items[0].spec.containers[0].image}'
+→ {pod_image}
+
+# Health check
+curl -sf {dev_health_url}
+→ {health_response_truncated}
+```
+
+</details>
+```
+
+**If kubeconfig is unavailable:** Skip the kubectl checks and note it in the comment. The health endpoint check is still performed — post whatever evidence is available.
+
+**If the chart version or image doesn't match expectations:** Add a warning line to the comment: `⚠️ Version mismatch — expected chart {expected}, got {actual}. The deployed version may not match the PR.` Still proceed to smoke tests, but the mismatch will be visible in the audit trail.
+
 ## Step 6.5: Fetch issue test criteria
 
 If the PR body contains `Closes #N` or `Fixes #N`, extract the linked issue number and fetch it:
