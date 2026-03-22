@@ -384,6 +384,22 @@ All {automated_count} automated criteria passed. **Human verification still requ
 
 2. **Update issue label:** Swap current status to `status: in-review` (signals that human verification is the remaining gate)
 
+### Step 8.6: Update issue checklist
+
+After posting the issue comment, update the **issue body** to check off test criteria that passed during QA:
+
+1. Fetch the current issue body via `mcp__gitea__get_issue_by_index`
+2. For each automated criterion that **passed** (including code-verified):
+   - Find the matching `- [ ]` line in the issue body
+   - Replace `- [ ]` with `- [x]`
+   - Append a brief annotation: ` — *{verification_method} in PR #{pr_number}*`
+     - `verification_method` is one of: `verified live`, `code-verified`, `smoke-tested`
+3. For criteria that **failed**, leave them as `- [ ]` (unchecked)
+4. For **human verification** criteria, always leave as `- [ ]`
+5. Use `mcp__gitea__issue_write` with `method: "update"` to save the updated body
+
+**Important:** Only modify the `- [ ]` / `- [x]` checkboxes and append annotations. Do not alter any other part of the issue body.
+
 ### If no linked issue:
 
 Skip this step entirely — only post the PR comment from Step 8.
