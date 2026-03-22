@@ -74,6 +74,40 @@ If a kubeconfig is available, check what's currently deployed to avoid unnecessa
 
 Report current state to the user before proceeding.
 
+## Step 3b: Ensure branch is up to date with base
+
+Before deploying, check if the head branch includes the latest changes from the base branch (usually `main`). Deploying a stale branch risks testing code that's missing recent fixes or has hidden conflicts.
+
+1. Resolve the Gitea API token (needed for the update-branch API):
+   ```bash
+   ps aux | grep 'gitea-mcp.*-token' | grep -v grep | head -1 | grep -oP '(?<=-token )\S+'
+   ```
+
+2. If a PR reference was provided, use the Gitea update-branch API to rebase server-side:
+   ```bash
+   curl -s -w "\n%{http_code}" -X POST \
+     "https://git.home.superwerewolves.ninja/api/v1/repos/{owner}/{repo}/pulls/{index}/update" \
+     -H "Authorization: token {GITEA_TOKEN}" \
+     -H "Content-Type: application/json" \
+     -d '{"style": "rebase"}'
+   ```
+
+   Interpret the response:
+   - **HTTP 200**: Branch was rebased onto latest base. Wait 5 seconds for the ref to update, then re-fetch the PR to get the new head SHA.
+   - **HTTP 409**: Merge conflicts — warn the user and stop. The branch needs manual conflict resolution before deploying.
+   - **HTTP 422**: Already up to date — proceed.
+
+3. If a branch name was provided directly (no PR context), use the local repo checkout to check:
+   ```bash
+   cd {local_path}
+   git fetch origin
+   git merge-base --is-ancestor origin/{default_branch} origin/{head_branch}
+   ```
+   - If the check passes (exit 0): branch already contains latest base — proceed.
+   - If it fails: warn the user that the branch is behind the base branch. Use `AskUserQuestion` with options:
+     - **Deploy anyway** — proceed without rebasing
+     - **Cancel** — stop and suggest running `/update-prs` first
+
 ## Step 4: Trigger deploy workflow
 
 Dispatch the deploy workflow using the Gitea Actions API:
@@ -106,18 +140,25 @@ Tell the user the workflow has been dispatched.
 If the run cannot be found after 5 minutes, stop and tell the user:
 > Could not find the workflow run. Check the Actions tab for `{owner}/{repo}` manually.
 
-## Step 6: Wait for Flux rollout
+## Step 6: Force Flux reconciliation and wait for rollout
 
-After the workflow succeeds, the chart needs to be picked up by Flux and rolled out:
+After the workflow succeeds, force Flux to pick up the new chart immediately instead of waiting for the next poll cycle (which can be up to 30 minutes):
 
-1. Wait 30 seconds for the chart to propagate to the registry.
-2. Poll the dev health URL every 30 seconds for up to 15 minutes:
+1. Wait 30 seconds for the chart to propagate to the OCI registry.
+2. If kubeconfig is available, force Flux to reconcile the HelmRelease:
+   ```bash
+   kubectl --kubeconfig=$HOME/.kube/qa-readonly-kubeconfig \
+     annotate helmrelease {dev_chart_name} -n {dev_namespace} \
+     reconcile.fluxcd.io/requestedAt="$(date -u +%Y-%m-%dT%H:%M:%SZ)" --overwrite 2>&1
+   ```
+   This triggers an immediate reconciliation without needing the `flux` CLI. If this fails (permissions, kubeconfig issues), fall back to passive polling in step 3.
+3. Poll the dev health URL every 30 seconds for up to 10 minutes:
    ```bash
    curl -sf {dev_health_url}
    ```
-3. Check if the service is healthy (HTTP 200).
+4. Check if the service is healthy (HTTP 200).
 
-**Timeout behavior:** If the health endpoint doesn't return a healthy response within 15 minutes, report that Flux rollout may not have completed but the deploy workflow itself succeeded.
+**Timeout behavior:** If the health endpoint doesn't return a healthy response within 10 minutes, report that Flux rollout may not have completed but the deploy workflow itself succeeded. Suggest checking the HelmRelease status manually.
 
 ## Step 7: Verify deployment
 
