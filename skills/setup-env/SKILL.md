@@ -213,10 +213,11 @@ The Agent Mail server runs locally — no tokens or external auth needed for sin
 
 ### 2h. Productivity Docs (optional)
 
-The productivity-hooks plugin and skills rely on two config documents that are injected into every prompt:
+The productivity-hooks plugin and skills rely on config documents at `~/.config/development-skills/`:
 
 - **`repos.md`** — shorthand table mapping repo names to owner, local paths, and descriptions. Used by `resolve-repo.md` for all skill input parsing.
 - **`infrastructure.md`** — IPs, domains, service URLs for the homelab environment. Used by `/investigate-bug`, `/qa-pr`, and injected on every prompt.
+- **`deploy-config.md`** — deploy configuration table mapping repos to deploy workflows, dev URLs, smoke endpoints, chart names, and namespaces. Used by `/qa-pr`.
 
 These live at `~/.config/development-skills/` (preferred) or fall back to `~/.claude/development-skills/config/`.
 

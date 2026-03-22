@@ -34,15 +34,15 @@ If the PR is already merged or closed, stop and tell the user.
 
 ## Step 3: Resolve deploy config
 
-Look up the repo in this deploy configuration table:
+Load the deploy configuration table from `~/.config/development-skills/deploy-config.md` and look up the repo.
 
-| Repo | Deploy workflow | Dev health URL | Dev base URL | Smoke endpoints | Dev chart name | Dev namespace | Dev chart version pattern |
-|------|----------------|----------------|--------------|-----------------|----------------|---------------|--------------------------|
-| `multi-agent-coordinator` | `deploy.yml` | `https://agents.apps.superwerewolves.ninja/api/health` | `https://agents.apps.superwerewolves.ninja` | `/api/health`, `/api/tasks`, `/api/metrics`, `/api/agents`, `/` | `multi-agent-coordinator-dev` | `multi-agent-coordinator-dev` | `0.1.0-dev.{run_number}` |
-| `food-automation` | `deploy.yaml` | `https://food-dev.apps.superwerewolves.ninja/api/health` | `https://food-dev.apps.superwerewolves.ninja` | `/api/health` | `food-automation-dev` | `food-automation-dev` | `0.1.0-dev.{run_number}` |
+!`cat ~/.config/development-skills/deploy-config.md`
 
-If the repo is **not in this table**, stop and tell the user:
-> Repo `{owner}/{repo}` does not have a dev deploy configuration. Add it to the qa-pr skill's deploy config table.
+If the file doesn't exist, stop and tell the user:
+> Deploy config not found at `~/.config/development-skills/deploy-config.md`. Run `/setup-env` to create it, or create it manually with a table mapping repos to deploy workflows, dev URLs, and smoke endpoints.
+
+If the repo is **not in the table**, stop and tell the user:
+> Repo `{owner}/{repo}` does not have a dev deploy configuration. Add it to `~/.config/development-skills/deploy-config.md`.
 
 Store the resolved config for use in later steps.
 
