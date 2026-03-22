@@ -1,6 +1,6 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "super-werewolves-skills",
+  "name": "development-skills",
   "description": "Dev workflow automation, hooks, and notifications for Gitea-hosted homelab repos.",
   "owner": {
     "name": "super-werewolves",

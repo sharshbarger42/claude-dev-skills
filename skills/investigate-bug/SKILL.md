@@ -83,11 +83,12 @@ A read-only kubeconfig is needed to query the K3s cluster. Check if one exists a
    c. Once the run succeeds, download the kubeconfig artifact:
       ```bash
       # List artifacts for the run
-      curl -sf -H "Authorization: token $(cat ~/.gitea-token 2>/dev/null || echo $GITEA_TOKEN)" \
+      GITEA_TOKEN=$(ps aux | grep 'gitea-mcp.*-token' | grep -v grep | head -1 | grep -oP '(?<=-token )\S+')
+      curl -sf -H "Authorization: token $GITEA_TOKEN" \
         "https://git.home.superwerewolves.ninja/api/v1/repos/super-werewolves/homelab-setup/actions/runs/{run_id}/artifacts" | jq .
 
       # Download the artifact file
-      curl -sf -H "Authorization: token $(cat ~/.gitea-token 2>/dev/null || echo $GITEA_TOKEN)" \
+      curl -sf -H "Authorization: token $GITEA_TOKEN" \
         "https://git.home.superwerewolves.ninja/api/v1/repos/super-werewolves/homelab-setup/actions/artifacts/{artifact_id}" \
         -o /tmp/kubeconfig-artifact.zip
 
