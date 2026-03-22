@@ -20,38 +20,7 @@ param(
 )
 
 $BACKGROUND_URL = ""
-
 $RoamingStateCheck = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\RoamingState"
-if (-not $DryRun -and -not $Defaults) {
-    if (Test-Path "$RoamingStateCheck\background.jpg") {
-        Write-Host ""
-        Write-Host "Background Image" -ForegroundColor Cyan
-        Write-Host "  Already configured: $RoamingStateCheck\background.jpg" -ForegroundColor Green
-        $response = Read-Host "  Replace it? (y/N)"
-        if ($response -eq "y" -or $response -eq "Y") {
-            Remove-Item "$RoamingStateCheck\background.jpg" -Force
-            Write-Host "  Enter the new image URL or local path:" -ForegroundColor Yellow
-            $BACKGROUND_URL = Read-Host "  Background image"
-        }
-    } else {
-        Write-Host ""
-        Write-Host "Background Image Setup" -ForegroundColor Cyan
-        Write-Host "You can optionally set a background image for the terminal." -ForegroundColor Yellow
-        Write-Host ""
-        $response = Read-Host "Do you have a background image (URL or local path)? (y/N)"
-        if ($response -eq "y" -or $response -eq "Y") {
-            Write-Host ""
-            Write-Host "Enter either:" -ForegroundColor Yellow
-            Write-Host "  - A URL: https://example.com/image.jpg" -ForegroundColor Yellow
-            Write-Host "  - A local path: C:\Users\...\Pictures\image.jpg" -ForegroundColor Yellow
-            Write-Host ""
-            $BACKGROUND_URL = Read-Host "Background image"
-            Write-Host ""
-        }
-    }
-} elseif ($Defaults) {
-    Write-Host "  [defaults] Skipping background image." -ForegroundColor Yellow
-}
 
 $ErrorActionPreference = "Stop"
 
@@ -144,6 +113,149 @@ $RoamingState = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8b
 $LocalState   = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState"
 $SettingsDst  = "$LocalState\settings.json"
 
+# --- Detect existing distros (needed before prompts) ---
+$ubuntuClaudeExists = $false
+$ubuntuExists = $false
+
+$savedErrorPref = $ErrorActionPreference
+$ErrorActionPreference = 'SilentlyContinue'
+
+try {
+    $distroList = (wsl.exe --list --all 2>$null) -replace "`0", ""
+    foreach ($line in ($distroList -split "`n")) {
+        $name = $line.Trim() -replace ' \(Default\)$', ''
+        if ($name -eq "Ubuntu-Claude") { $ubuntuClaudeExists = $true }
+        if ($name -eq "Ubuntu") { $ubuntuExists = $true }
+    }
+} catch { }
+
+$ErrorActionPreference = $savedErrorPref
+
+# --- Helper: read a value from env-config.yaml inside the distro ---
+function Get-DistroConfig {
+    param([string]$Key)
+    if (-not $ubuntuClaudeExists) { return "" }
+    $readScript = @'
+#!/bin/bash
+key="$1"
+cfg="$HOME/.claude/env-config.yaml"
+[ ! -f "$cfg" ] && exit 0
+if [[ "$key" == *.* ]]; then
+    section="${key%%.*}"; field="${key#*.}"
+    sed -n "/^${section}:/,/^[^ ]/p" "$cfg" | grep "^ *${field}:" | head -1 | sed 's/^[^:]*: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/' | tr -d '\r' | sed 's/^ *//;s/ *$//'
+else
+    grep "^${key}:" "$cfg" | head -1 | sed 's/^[^:]*: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/' | tr -d '\r' | sed 's/^ *//;s/ *$//'
+fi
+'@
+    $readScript | Invoke-Wsl -d Ubuntu-Claude -u claude-user -- bash -c "tr -d '\r' > /tmp/read-config.sh"
+    $result = Invoke-Wsl -d Ubuntu-Claude -u claude-user -- bash /tmp/read-config.sh $Key
+    return ($result | Out-String).Trim()
+}
+
+# --- Helper: save a value to env-config.yaml inside the distro ---
+function Set-DistroConfig {
+    param([string]$Key, [string]$Value)
+    if (-not $ubuntuClaudeExists) { return }
+    $writeScript = @'
+#!/bin/bash
+key="$1"; value="$2"
+cfg="$HOME/.claude/env-config.yaml"
+mkdir -p "$(dirname "$cfg")"
+safe_value=$(printf '%s' "$value" | sed 's/[|&\\/]/\\&/g')
+if [[ "$key" != *.* ]]; then
+    if [ -f "$cfg" ] && grep -q "^${key}:" "$cfg"; then
+        sed -i "s|^${key}:.*|${key}: \"${safe_value}\"|" "$cfg"
+    else
+        echo "${key}: \"${value}\"" >> "$cfg"
+    fi
+else
+    section="${key%%.*}"; field="${key#*.}"
+    if [ ! -f "$cfg" ]; then
+        printf '%s:\n  %s: "%s"\n' "$section" "$field" "$value" > "$cfg"
+        exit 0
+    fi
+    if grep -q "^${section}:" "$cfg"; then
+        if sed -n "/^${section}:/,/^[^ ]/p" "$cfg" | grep -q "^ *${field}:"; then
+            sed -i "/^${section}:/,/^[^ ]/{s|^ *${field}:.*|  ${field}: \"${safe_value}\"|}" "$cfg"
+        else
+            sed -i "/^${section}:/a\  ${field}: \"${safe_value}\"" "$cfg"
+        fi
+    else
+        printf '\n%s:\n  %s: "%s"\n' "$section" "$field" "$value" >> "$cfg"
+    fi
+fi
+'@
+    $writeScript | Invoke-Wsl -d Ubuntu-Claude -u claude-user -- bash -c "tr -d '\r' > /tmp/write-config.sh"
+    Invoke-Wsl -d Ubuntu-Claude -u claude-user -- bash /tmp/write-config.sh $Key $Value
+}
+
+if ($DryRun) {
+    if ($ubuntuClaudeExists) {
+        Write-Host "[Detected] Ubuntu-Claude distro exists" -ForegroundColor Green
+    } else {
+        Write-Host "[Detected] Ubuntu-Claude distro not found - would create fresh" -ForegroundColor Yellow
+        if ($ubuntuExists) {
+            Write-Host "[Detected] Ubuntu base distro available" -ForegroundColor Green
+        } else {
+            Write-Host "[Detected] Ubuntu base distro NOT found - setup would fail" -ForegroundColor Red
+        }
+    }
+    Write-Host ""
+}
+
+# --- Background image prompt (state-aware) ---
+if (-not $DryRun -and -not $Defaults) {
+    if (Test-Path "$RoamingStateCheck\background.jpg") {
+        Write-Host ""
+        Write-Host "Background Image" -ForegroundColor Cyan
+        Write-Host "  Already configured." -ForegroundColor Green
+    } else {
+        # Check if a URL was saved from a previous run
+        $savedBgUrl = Get-DistroConfig "terminal.background_url"
+        if (-not [string]::IsNullOrWhiteSpace($savedBgUrl)) {
+            Write-Host ""
+            Write-Host "Background Image" -ForegroundColor Cyan
+            Write-Host "  Reusing saved URL: $savedBgUrl" -ForegroundColor Green
+            $BACKGROUND_URL = $savedBgUrl
+        } else {
+            Write-Host ""
+            Write-Host "Background Image Setup" -ForegroundColor Cyan
+            Write-Host "You can optionally set a background image for the terminal." -ForegroundColor Yellow
+            Write-Host ""
+            $response = Read-Host "Do you have a background image (URL or local path)? (y/N)"
+            if ($response -eq "y" -or $response -eq "Y") {
+                Write-Host ""
+                Write-Host "Enter either:" -ForegroundColor Yellow
+                Write-Host "  - A URL: https://example.com/image.jpg" -ForegroundColor Yellow
+                Write-Host "  - A local path: C:\Users\...\Pictures\image.jpg" -ForegroundColor Yellow
+                Write-Host ""
+                $BACKGROUND_URL = Read-Host "Background image"
+                Write-Host ""
+            }
+        }
+    }
+} elseif ($DryRun) {
+    if (Test-Path "$RoamingStateCheck\background.jpg") {
+        Write-Host "[Already configured] Background image" -ForegroundColor Green
+    } else {
+        $savedBgUrl = Get-DistroConfig "terminal.background_url"
+        if (-not [string]::IsNullOrWhiteSpace($savedBgUrl)) {
+            Write-Host "[Would reuse] Saved background URL: $savedBgUrl" -ForegroundColor Green
+        } else {
+            Write-Host "[Would prompt] Background image URL or path" -ForegroundColor Yellow
+        }
+    }
+} elseif ($Defaults) {
+    # In Defaults mode, reuse saved URL if available
+    $savedBgUrl = Get-DistroConfig "terminal.background_url"
+    if (-not [string]::IsNullOrWhiteSpace($savedBgUrl)) {
+        $BACKGROUND_URL = $savedBgUrl
+        Write-Host "  [defaults] Reusing saved background: $savedBgUrl" -ForegroundColor Yellow
+    } else {
+        Write-Host "  [defaults] Skipping background image." -ForegroundColor Yellow
+    }
+}
+
 # --- 1. Install JetBrainsMono Nerd Font ---
 if ($DryRun) {
     Write-Host "[Would check] JetBrainsMono Nerd Font installation" -ForegroundColor Yellow
@@ -194,6 +306,7 @@ if ($DryRun) {
             try {
                 Invoke-WebRequest -Uri $cleanPath -OutFile "$RoamingState\background.jpg"
                 Write-Host "  Done." -ForegroundColor Green
+                Set-DistroConfig "terminal.background_url" $cleanPath
             } catch {
                 Write-Warning "Failed to download background image: $($_.Exception.Message)"
             }
@@ -202,6 +315,7 @@ if ($DryRun) {
             try {
                 Copy-Item $cleanPath "$RoamingState\background.jpg" -Force
                 Write-Host "  Done." -ForegroundColor Green
+                Set-DistroConfig "terminal.background_url" $cleanPath
             } catch {
                 Write-Warning "Failed to copy background image: $($_.Exception.Message)"
             }
@@ -217,7 +331,16 @@ $SharedMountPoint = ""
 
 if ($DryRun) {
     Write-Host ""
-    Write-Host "[Would prompt] Shared Windows directory configuration" -ForegroundColor Yellow
+    if ($ubuntuClaudeExists) {
+        $existingShareDry = (Invoke-Wsl -d Ubuntu-Claude -u root -- bash -c "grep 'drvfs' /etc/fstab 2>/dev/null | grep -v '^#' || true" | Out-String).Trim()
+        if (-not [string]::IsNullOrWhiteSpace($existingShareDry)) {
+            Write-Host "[Already configured] Shared directory: $existingShareDry" -ForegroundColor Green
+        } else {
+            Write-Host "[Would prompt] Shared Windows directory configuration" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "[Would prompt] Shared Windows directory (after distro creation)" -ForegroundColor Yellow
+    }
 } elseif ($Defaults) {
     Write-Host "  [defaults] Skipping shared directory." -ForegroundColor Yellow
 } else {
@@ -230,8 +353,8 @@ if ($DryRun) {
     Write-Host ""
     Write-Host "Shared Windows Directory" -ForegroundColor Cyan
     if (-not [string]::IsNullOrWhiteSpace($existingShare)) {
-        Write-Host "  Currently configured: $existingShare" -ForegroundColor Green
-        $shareResponse = Read-Host "  Change it? (y/N)"
+        Write-Host "  Already configured: $existingShare" -ForegroundColor Green
+        $shareResponse = "n"
     } else {
         Write-Host "  Automount is disabled for sandbox isolation, but you can share" -ForegroundColor Yellow
         Write-Host "  a single Windows directory into WSL." -ForegroundColor Yellow
@@ -271,28 +394,7 @@ if ($DryRun) {
     }
 }
 
-# --- 4. Check for existing Ubuntu-Claude ---
-if (-not $DryRun) {
-    Write-Host "`nChecking for WSL Ubuntu-Claude..." -ForegroundColor Cyan
-}
-
-$ubuntuClaudeExists = $false
-$ubuntuExists = $false
-
-$savedErrorPref = $ErrorActionPreference
-$ErrorActionPreference = 'SilentlyContinue'
-
-try {
-    $null = wsl.exe -d Ubuntu-Claude -- bash -c "exit 0" 2>&1
-    if ($LASTEXITCODE -eq 0) { $ubuntuClaudeExists = $true }
-
-    $null = wsl.exe -d Ubuntu -- bash -c "exit 0" 2>&1
-    if ($LASTEXITCODE -eq 0) { $ubuntuExists = $true }
-} catch { }
-
-$ErrorActionPreference = $savedErrorPref
-
-# --- Update flags ---
+# --- 4. Update flags ---
 $DoRepoSync = $true
 
 # --- Existing distro: status check + update menu ---
@@ -302,11 +404,11 @@ if ($ubuntuClaudeExists) {
     $checkScript = @'
 echo "claude_user=$(id claude-user &>/dev/null && echo Y || echo N)"
 echo "sudo_rules=$(test -f /etc/sudoers.d/claude-user && echo Y || echo N)"
-echo "wsl_conf=$(grep -q 'default=claude-user' /etc/wsl.conf 2>/dev/null && echo Y || echo N)"
+echo "wsl_conf=$(grep -q 'default.*=.*claude-user' /etc/wsl.conf 2>/dev/null && echo Y || echo N)"
 echo "dev_skills=$(test -d /home/claude-user/development-skills && echo Y || echo N)"
 echo "shared_dir=$(grep -q 'drvfs' /etc/fstab 2>/dev/null && echo Y || echo N)"
 echo "vscode=$(test -L /usr/local/bin/code && echo Y || echo N)"
-echo "ro_mount=$(grep -q 'options=ro' /etc/wsl.conf 2>/dev/null && echo Y || echo N)"
+echo "ro_mount=$(grep -q 'options.*=.*ro' /etc/wsl.conf 2>/dev/null && echo Y || echo N)"
 '@
     $checkOutput = ($checkScript | Invoke-Wsl -d Ubuntu-Claude -u root -- bash | Out-String)
 
@@ -369,6 +471,8 @@ echo "ro_mount=$(grep -q 'options=ro' /etc/wsl.conf 2>/dev/null && echo Y || ech
     } elseif ($DryRun) {
         Write-Host "  [dry-run] Would offer update menu (defaults: $defaultStr)" -ForegroundColor Yellow
         $DoRepoSync = $true
+        $doSudoReconfig = $sudoMissing
+        $doVSCodeSetup = $vscodeMissing
     } else {
         Write-Host "  Available updates:" -ForegroundColor Cyan
         $d1 = if ($defaultNums -contains "1") { "*" } else { " " }
@@ -462,6 +566,21 @@ with open('/etc/wsl.conf', 'w') as f:
 }
 
 # --- Fresh install: create distro ---
+if (-not $ubuntuClaudeExists -and $DryRun) {
+    Write-Host ""
+    if (-not $ubuntuExists) {
+        Write-Host "[Would FAIL] Ubuntu base distro not found" -ForegroundColor Red
+        Write-Host "  Install first: winget install Canonical.Ubuntu" -ForegroundColor Yellow
+    } else {
+        Write-Host "[Would create] Ubuntu-Claude distro from Ubuntu base" -ForegroundColor Yellow
+        Write-Host "  Export Ubuntu -> C:\wsl-exports\ubuntu-base.tar" -ForegroundColor Yellow
+        Write-Host "  Import as Ubuntu-Claude -> C:\wsl-instances\ubuntu-claude" -ForegroundColor Yellow
+        Write-Host "[Would configure] claude-user account, wsl.conf, sudoers" -ForegroundColor Yellow
+        Write-Host "[Would prompt] Sudo permission selection" -ForegroundColor Yellow
+        Write-Host "[Would configure] VS Code symlink + readonly Windows mount" -ForegroundColor Yellow
+    }
+}
+
 if (-not $ubuntuClaudeExists -and -not $DryRun) {
     if (-not $ubuntuExists) {
         Write-Error @"
@@ -690,6 +809,7 @@ if (-not $DryRun -and (Test-Path $SettingsDst)) {
                 "guid" = "{9c42b463-6505-48d5-9c52-dc2df3e5b325}"
                 "name" = "Ubuntu-Claude"
                 "commandline" = "wsl.exe -d Ubuntu-Claude"
+                "startingDirectory" = "//wsl$/Ubuntu-Claude/home/claude-user"
                 "hidden" = $false
                 "icon" = "ms-appdata:///roaming/claude-icon.ico"
                 "tabTitle" = "Claude (Sandboxed)"
@@ -715,7 +835,29 @@ if (-not $DryRun -and (Test-Path $SettingsDst)) {
             $needsSave = $true
             Write-Host "  Profile added successfully" -ForegroundColor Green
         } else {
-            Write-Host "  Custom profile already exists - skipping" -ForegroundColor Yellow
+            # Update existing profile with any missing fields
+            $existingProfile = $settings.profiles.list | Where-Object {
+                $_.name -eq "Ubuntu-Claude" -and $_.commandline -like "*Ubuntu-Claude*" -and -not $_.source
+            } | Select-Object -First 1
+
+            if ($existingProfile) {
+                $updated = @()
+                if (-not $existingProfile.startingDirectory) {
+                    $existingProfile | Add-Member -NotePropertyName "startingDirectory" -NotePropertyValue "//wsl$/Ubuntu-Claude/home/claude-user" -Force
+                    $updated += "startingDirectory"
+                }
+                if (-not $existingProfile.backgroundImage -and (Test-Path "$RoamingState\background.jpg")) {
+                    $existingProfile | Add-Member -NotePropertyName "backgroundImage" -NotePropertyValue "ms-appdata:///roaming/background.jpg" -Force
+                    $existingProfile | Add-Member -NotePropertyName "backgroundImageOpacity" -NotePropertyValue 0.5 -Force
+                    $updated += "backgroundImage"
+                }
+                if ($updated.Count -gt 0) {
+                    $needsSave = $true
+                    Write-Host "  Updated profile: $($updated -join ', ')" -ForegroundColor Cyan
+                } else {
+                    Write-Host "  Custom profile already exists - up to date" -ForegroundColor Green
+                }
+            }
         }
 
         if ($needsSave -or $hiddenCount -gt 0) {
@@ -749,5 +891,5 @@ if ($DryRun) {
     Write-Host "  ~/development-skills/setup/wsl-sandbox/setup-linux.sh"
     Write-Host ""
     Write-Host "Then open Claude Code and run:" -ForegroundColor Yellow
-    Write-Host "  /start"
+    Write-Host "  /setup-env"
 }

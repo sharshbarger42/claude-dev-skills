@@ -126,7 +126,13 @@ fi
 
 # --- 1. Core system packages ---
 echo "--- Installing core packages ---"
-sudo apt-get update > /dev/null 2>&1
+APT_LISTS="/var/lib/apt/lists"
+APT_AGE_SECONDS=$(( $(date +%s) - $(stat -c %Y "$APT_LISTS" 2>/dev/null || echo 0) ))
+if (( APT_AGE_SECONDS > 3600 )); then
+    sudo apt-get update > /dev/null 2>&1
+else
+    echo "  [skip] apt-get update (last run <1h ago)"
+fi
 install_if_missing git git
 install_if_missing jq jq
 install_if_missing curl curl
@@ -256,9 +262,20 @@ if [[ "$DOTFILES_READY" == "true" && -d "$DOTFILES_DIR" ]]; then
     cd "$DOTFILES_DIR"
     for pkg in $STOW_PACKAGES; do
         if [[ -d "$pkg" ]]; then
-            stow -n "$pkg" 2>&1 | { grep "existing target" || true; } | sed 's/.*: //' | while read -r conflict; do
-                rm -f "$HOME/$conflict" 2>/dev/null || true
-            done
+            CONFLICTS=$(stow -n "$pkg" 2>&1 | { grep "existing target" || true; } | sed 's/.*: //')
+            if [[ -n "$CONFLICTS" ]]; then
+                echo "    [conflict] $pkg has existing files:"
+                echo "$CONFLICTS" | sed 's/^/      /'
+                read -rp "    Overwrite these files? (y/N): " OVERWRITE_CHOICE
+                if [[ "${OVERWRITE_CHOICE,,}" == "y" ]]; then
+                    echo "$CONFLICTS" | while read -r conflict; do
+                        rm -f "$HOME/$conflict" 2>/dev/null || true
+                    done
+                else
+                    echo "    [skip] $pkg (kept existing files)"
+                    continue
+                fi
+            fi
             stow "$pkg" 2>/dev/null && echo "    [stow] $pkg" || echo "    [warn] $pkg failed to stow"
         else
             echo "    [skip] $pkg (not found)"
@@ -266,22 +283,22 @@ if [[ "$DOTFILES_READY" == "true" && -d "$DOTFILES_DIR" ]]; then
     done
     cd "$HOME"
 else
-    echo "  Applying default dotfiles from development-skills..."
-    cp "$DOTFILES_DEFAULTS/zsh/.zshrc" "$HOME/.zshrc" 2>/dev/null || true
-    cp "$DOTFILES_DEFAULTS/tmux/.tmux.conf" "$HOME/.tmux.conf" 2>/dev/null || true
-    echo "  Default dotfiles applied."
+    if [[ -f "$HOME/.zshrc" || -f "$HOME/.tmux.conf" ]]; then
+        echo "  [skip] Dotfiles already exist (~/.zshrc or ~/.tmux.conf), not overwriting."
+        echo "  To apply defaults, remove existing files and re-run."
+    else
+        echo "  Applying default dotfiles from development-skills..."
+        cp "$DOTFILES_DEFAULTS/zsh/.zshrc" "$HOME/.zshrc" 2>/dev/null || true
+        cp "$DOTFILES_DEFAULTS/tmux/.tmux.conf" "$HOME/.tmux.conf" 2>/dev/null || true
+        echo "  Default dotfiles applied."
+    fi
 fi
 
 # --- 7. Install development-skills ---
 echo ""
 echo "--- Installing development-skills ---"
-if [[ -f "$DEV_SKILLS_DIR/install.sh" ]]; then
-    bash "$DEV_SKILLS_DIR/install.sh"
-else
-    echo "  [error] install.sh not found at $DEV_SKILLS_DIR"
-    echo "  Skills not installed. Run install.sh manually after fixing."
-    exit 1
-fi
+echo "  [skip] install.sh is deprecated — use /setup-env inside Claude Code instead."
+echo "  Run: claude then /setup-env"
 
 # --- 8. Set up PATH and repos directory ---
 echo ""
