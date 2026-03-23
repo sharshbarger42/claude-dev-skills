@@ -1,0 +1,52 @@
+#!/bin/bash
+# Server-side pre-receive hook: reject pushes containing disallowed commits
+# Deploy to: <gitea-data>/gitea-repositories/<owner>/<repo>.git/hooks/pre-receive.d/reject-claude
+#
+# Rejects:
+#   1. Merge commits (commits with more than one parent)
+#   2. Commits with Co-Authored-By Claude references
+#
+# This script is the source of truth. The deployed copies on LXC 112 are identical.
+
+while read oldrev newrev refname; do
+    # Skip branch deletions
+    if [ "$newrev" = "0000000000000000000000000000000000000000" ]; then
+        continue
+    fi
+
+    # For new branches, only check commits not already in any existing ref
+    # For updates, check only commits between old and new
+    if [ "$oldrev" = "0000000000000000000000000000000000000000" ]; then
+        commits=$(git rev-list "$newrev" --not --all)
+    else
+        commits=$(git rev-list "$oldrev".."$newrev")
+    fi
+
+    for commit in $commits; do
+        # Check for merge commits (more than one parent)
+        parent_count=$(git cat-file -p "$commit" | grep -c '^parent ')
+        if [ "$parent_count" -gt 1 ]; then
+            echo ""
+            echo "*** PUSH REJECTED — Merge commit detected ***"
+            echo "Commit $commit is a merge commit ($parent_count parents)."
+            echo "This repo requires linear history. Use rebase instead of merge:"
+            echo "  git rebase main"
+            echo "Or squash your branch before pushing."
+            echo ""
+            exit 1
+        fi
+
+        # Check for Claude co-authored-by references
+        message=$(git log --format="%B" -n 1 "$commit")
+        if echo "$message" | grep -qi -E "co-authored-by.*claude"; then
+            echo ""
+            echo "*** PUSH REJECTED — Co-Authored-By Claude reference ***"
+            echo "Commit $commit contains a Co-Authored-By Claude reference."
+            echo "Please amend the commit to remove it before pushing."
+            echo ""
+            exit 1
+        fi
+    done
+done
+
+exit 0
