@@ -12,19 +12,13 @@ If `multi_agent` is **not true**, skip this entire lib. Agent names and registra
 
 ## Derive agent name
 
-Generate a deterministic agent name from the current session:
+Generate a deterministic agent name from the Claude Code process PID:
 
 ```bash
-AGENT_NAME="agent-$(echo "$CLAUDE_SESSION_ID" | cut -c1-8)"
+AGENT_NAME="agent-${PPID}"
 ```
 
-If `$CLAUDE_SESSION_ID` is empty, fall back to a random suffix:
-
-```bash
-AGENT_NAME="agent-$(head -c 4 /dev/urandom | xxd -p)"
-```
-
-Store `AGENT_NAME` as a variable for the rest of the session. Use it in all Agent Mail messages and Discord notifications.
+`$PPID` is the Claude Code process PID — stable across all bash invocations within the same session and unique per concurrent instance. Store `AGENT_NAME` as a variable for the rest of the session. Use it in all Agent Mail messages and Discord notifications.
 
 ## Register with Agent Mail
 

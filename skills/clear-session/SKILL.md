@@ -1,5 +1,5 @@
 ---
-name: clear
+name: clear-session
 description: Clear the active session file when you're done with current work and moving on to something new.
 allowed-tools: Bash, Read
 ---
@@ -23,7 +23,7 @@ Also check the current directory.
 Derive the agent ID:
 
 ```bash
-AGENT_ID="$(echo "${CLAUDE_SESSION_ID:-unknown}" | cut -c1-8)"
+AGENT_ID="$PPID"
 ```
 
 Look for `SESSION-${AGENT_ID}.md` in the results. This is our file.

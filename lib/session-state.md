@@ -11,11 +11,11 @@ The file is **overwritten** on each update — it represents current state, not 
 ## Derive session file path
 
 ```bash
-AGENT_ID="$(echo "${CLAUDE_SESSION_ID:-unknown}" | cut -c1-8)"
+AGENT_ID="$PPID"
 SESSION_FILE="${REPO_LOCAL_PATH}/SESSION-${AGENT_ID}.md"
 ```
 
-**Important:** Always use `unknown` as the fallback when `CLAUDE_SESSION_ID` is unset. Never use random values — the same ID must be derived on every invocation so writes and reads target the same file. All files that derive an agent ID (this lib, `/clear`, `/start`) must use this exact same fallback.
+`$PPID` is the Claude Code process PID — stable across all bash invocations within the same session and unique per concurrent Claude Code instance. All files that derive an agent ID (this lib, `/clear-session`, `/start`) must use `$PPID`.
 
 Where `REPO_LOCAL_PATH` is the local checkout path of the repo being worked on (from the shorthand table in `config/repos.md`). If the repo is not in the shorthand table, use the current working directory (`pwd`). Never leave `REPO_LOCAL_PATH` empty — validate it before writing.
 
@@ -83,7 +83,7 @@ Call this at skill start (before Step 1 work begins) to check for an existing se
 
 ## Session Clear
 
-Call this when the user invokes `/clear`, or when a skill completes its full flow successfully (final report posted).
+Call this when the user invokes `/clear-session`, or when a skill completes its full flow successfully (final report posted).
 
 Delete the session file:
 ```bash

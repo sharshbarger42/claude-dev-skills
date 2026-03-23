@@ -39,7 +39,7 @@ find ~/gitea-repos -maxdepth 2 -name "SESSION-*.md" -type f 2>/dev/null
 If session files are found:
 
 1. Read each one
-2. Derive your own agent ID: `AGENT_ID="$(echo "${CLAUDE_SESSION_ID:-unknown}" | cut -c1-8)"`
+2. Derive your own agent ID: `AGENT_ID="$PPID"`
 3. **Auto-match your own session:** If one of the files is `SESSION-${AGENT_ID}.md`, that's yours — present it directly as a resume candidate. You don't need to ask "which is yours."
 4. **Other agents' sessions:** Any session files that don't match your agent ID belong to other agents. Present them as informational context (read-only) — never delete them.
 5. If **your session file exists**, present it and ask:

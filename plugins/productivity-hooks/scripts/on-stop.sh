@@ -9,7 +9,7 @@ if [[ -z "$DISCORD_WEBHOOK" ]]; then
     exit 0
 fi
 
-AGENT_NAME="agent-$(echo "${CLAUDE_SESSION_ID:-unknown}" | cut -c1-8)"
+AGENT_NAME="agent-${PPID}"
 REPO_NAME="$(basename "$(pwd)" 2>/dev/null || echo "unknown")"
 
 # Escape double quotes for safe JSON interpolation

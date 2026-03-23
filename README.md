@@ -71,7 +71,7 @@ development-skills/
 | `/start [repo]` | Full workspace orientation |
 | `/start-quick [repo]` | Quick orientation |
 | `/status` | Catch-up summary — active sessions, git activity, next actions |
-| `/clear` | Clear active session file when done with current work |
+| `/clear-session` | Clear active session file when done with current work |
 | `/setup-env [section] [repo]` | Interactive environment setup — Gitea, deploy config, plugins, tools |
 
 ### Planning
