@@ -2,7 +2,7 @@
 name: deploy-status
 description: Check deploy pipeline health — CI workflows on main, Flux reconciliation, and deployed app version. Offers to investigate and fix failures.
 args: "[repo]"
-allowed-tools: Read, Bash, Glob, Grep, Agent, AskUserQuestion, WebFetch, mcp__gitea__actions_run_read, mcp__gitea__pull_request_read, mcp__gitea__list_repo_action_runs, mcp__gitea__get_file_contents, mcp__gitea__search_repos
+allowed-tools: Read, Bash, Glob, Grep, Agent, AskUserQuestion, WebFetch, mcp__gitea__actions_run_read, mcp__gitea__actions_run_write, mcp__gitea__pull_request_read, mcp__gitea__get_file_contents, mcp__gitea__search_repos
 ---
 
 # Deploy Status
@@ -20,7 +20,7 @@ Parse `$ARGUMENTS` using the resolution logic above. The user can provide:
 - **Repo reference** (`repo`, `owner/repo`): check deploy status for that repo
 - **No argument**: use `AskUserQuestion` to ask which repo (list repos from deploy config that have deploy workflows)
 
-Resolve the `owner` and `repo`. Also resolve the local path from the repos shorthand table.
+Resolve the `owner` and `repo`. Also resolve the local path from the repos shorthand table (optional — only needed for `git ls-remote` in Step 3d).
 
 ## Step 2: Load deploy config
 
@@ -78,17 +78,18 @@ To get the latest commit on the default branch (always fresh from remote):
 git ls-remote origin refs/heads/{default_branch} | cut -f1
 ```
 
-Run this from the repo's local path. If the local path doesn't exist, use the Gitea API instead:
+Run this from the repo's local path. **If the result is empty** (branch doesn't exist or remote is unreachable), report "Unable to determine latest commit on {default_branch}" and skip version comparison in Step 5 — do not proceed with an empty SHA.
+
+If the local path doesn't exist, use the Gitea API instead:
 
 ```
-mcp__gitea__get_file_contents
+mcp__gitea__actions_run_read
+  method: list_runs
   owner: {owner}
   repo: {repo}
-  ref: {default_branch}
-  filePath: "README.md"
 ```
 
-And extract the commit SHA from the response metadata, or use `mcp__gitea__list_repo_commits` filtered to the default branch (limit 1).
+Filter to runs on the default branch and extract the `head_sha` from the most recent run.
 
 ## Step 4: Check Flux status (deployed services only)
 
@@ -143,11 +144,11 @@ kubectl --kubeconfig=$HOME/.kube/qa-readonly-kubeconfig \
 
 Check for pods in CrashLoopBackOff, ImagePullBackOff, or other error states.
 
-Also get the deployed image tag:
+Also get the deployed image tag (filter to running pods to avoid stale data from terminating pods during rollouts):
 
 ```bash
 kubectl --kubeconfig=$HOME/.kube/qa-readonly-kubeconfig \
-  get pods -n {namespace} -o jsonpath='{.items[0].spec.containers[0].image}' 2>/dev/null
+  get pods -n {namespace} --field-selector=status.phase=Running -o jsonpath='{.items[0].spec.containers[0].image}' 2>/dev/null
 ```
 
 ## Step 5: Verify deployed app version
@@ -168,9 +169,7 @@ If the repo has a version endpoint, also check it:
 curl -sf --max-time 10 {prod_base_url}{version_endpoint}
 ```
 
-Extract the `commit` or `BUILD_COMMIT` field from the response. Compare it against:
-1. The latest commit SHA on the default branch (from Step 3d)
-2. The commit SHA from the latest successful deploy workflow run
+Extract the `commit` or `BUILD_COMMIT` field from the response. Compare it against the **latest commit SHA on the default branch** (from Step 3d) — this is the authoritative target. If the deployed commit doesn't match, also check the latest successful deploy workflow run SHA to distinguish between "deploy hasn't run yet" vs "deploy ran but Flux hasn't rolled out."
 
 If they don't match, flag as **version mismatch** — the deployed version is behind.
 
@@ -254,7 +253,7 @@ Use `AskUserQuestion` with options tailored to the failures found:
 
 ### If user chooses "Investigate failures"
 
-Launch an Agent with `subagent_type: "debugger"` to:
+Launch an Agent with `subagent_type: "general-purpose"` to:
 
 1. For CI failures: fetch the failing job's logs using `mcp__gitea__actions_run_read` with `method: "get_job_log"`, identify the error, and suggest a fix
 2. For version mismatches: check if a deploy workflow ran for the latest commit, check if Flux has pending reconciliation, check HelmRelease events for errors
@@ -267,17 +266,27 @@ Present the findings and ask if the user wants to:
 
 ### If user chooses "Force Flux reconcile"
 
+> **Note:** Despite the name `qa-readonly-kubeconfig`, this kubeconfig has write permissions for Flux annotation operations. The naming is a legacy artifact.
+
 ```bash
 kubectl --kubeconfig=$HOME/.kube/qa-readonly-kubeconfig \
   annotate helmrelease {chart_name} -n {namespace} \
   reconcile.fluxcd.io/requestedAt="$(date -u +%Y-%m-%dT%H:%M:%SZ)" --overwrite
 ```
 
-Wait 60 seconds, then re-check the HelmRelease status and health endpoint. Report whether reconciliation resolved the issue.
+Wait for Flux to process the reconciliation:
+
+```bash
+sleep 60
+```
+
+Then re-check the HelmRelease status and health endpoint. Report whether reconciliation resolved the issue.
 
 ### If user chooses "Redeploy"
 
-Dispatch the deploy workflow:
+Use `AskUserQuestion` to confirm before dispatching: "This will trigger a production deploy of `{owner}/{repo}` from `{default_branch}`. Proceed?"
+
+If confirmed, dispatch the deploy workflow:
 
 ```
 mcp__gitea__actions_run_write
@@ -294,6 +303,6 @@ Then follow the same wait-and-verify pattern as the `/deploy-dev` skill (poll fo
 
 If no issues were found, report concisely:
 
-> All clear — CI passing, Flux healthy, deployed version matches latest main.
+> All clear — CI passing{", Flux healthy" if Flux was checked}{", deployed version matches latest main" if version was verified}.
 
 If issues were found and addressed, report what was done. If issues remain unresolved, list them clearly.
