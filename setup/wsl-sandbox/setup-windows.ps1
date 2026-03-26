@@ -220,17 +220,12 @@ if (-not $DryRun -and -not $Defaults) {
         } else {
             Write-Host ""
             Write-Host "Background Image Setup" -ForegroundColor Cyan
-            Write-Host "You can optionally set a background image for the terminal." -ForegroundColor Yellow
+            Write-Host "  You can set a background image for the terminal." -ForegroundColor Yellow
+            Write-Host "  Enter a URL or local path (leave blank to skip):" -ForegroundColor Yellow
             Write-Host ""
-            $response = Read-Host "Do you have a background image (URL or local path)? (y/N)"
-            if ($response -eq "y" -or $response -eq "Y") {
-                Write-Host ""
-                Write-Host "Enter either:" -ForegroundColor Yellow
-                Write-Host "  - A URL: https://example.com/image.jpg" -ForegroundColor Yellow
-                Write-Host "  - A local path: C:\Users\...\Pictures\image.jpg" -ForegroundColor Yellow
-                Write-Host ""
-                $BACKGROUND_URL = Read-Host "Background image"
-                Write-Host ""
+            $bgInput = Read-Host "  Background image"
+            if (-not [string]::IsNullOrWhiteSpace($bgInput)) {
+                $BACKGROUND_URL = $bgInput
             }
         }
     }
@@ -253,6 +248,55 @@ if (-not $DryRun -and -not $Defaults) {
         Write-Host "  [defaults] Reusing saved background: $savedBgUrl" -ForegroundColor Yellow
     } else {
         Write-Host "  [defaults] Skipping background image." -ForegroundColor Yellow
+    }
+}
+
+# --- Color theme selection (state-aware) ---
+$ThemeChoices = [ordered]@{
+    "1" = "One Half Dark"
+    "2" = "Catppuccin Mocha"
+    "3" = "Catppuccin Macchiato"
+    "4" = "Catppuccin Frappe"
+    "5" = "Catppuccin Latte"
+}
+
+$SelectedTheme = "One Half Dark"
+
+if (-not $DryRun -and -not $Defaults) {
+    $savedTheme = Get-DistroConfig "terminal.color_scheme"
+    if (-not [string]::IsNullOrWhiteSpace($savedTheme)) {
+        Write-Host ""
+        Write-Host "Color Theme" -ForegroundColor Cyan
+        Write-Host "  Already configured: $savedTheme" -ForegroundColor Green
+        $SelectedTheme = $savedTheme
+    } else {
+        Write-Host ""
+        Write-Host "Color Theme" -ForegroundColor Cyan
+        foreach ($entry in $ThemeChoices.GetEnumerator()) {
+            Write-Host "    $($entry.Key). $($entry.Value)"
+        }
+        Write-Host ""
+        $themeChoice = Read-Host "  Selection (default: 1)"
+        if ([string]::IsNullOrWhiteSpace($themeChoice)) { $themeChoice = "1" }
+        if ($ThemeChoices.Contains($themeChoice)) {
+            $SelectedTheme = $ThemeChoices[$themeChoice]
+        }
+        Write-Host "  Selected: $SelectedTheme" -ForegroundColor Green
+    }
+} elseif ($DryRun) {
+    $savedTheme = Get-DistroConfig "terminal.color_scheme"
+    if (-not [string]::IsNullOrWhiteSpace($savedTheme)) {
+        Write-Host "[Already configured] Color theme: $savedTheme" -ForegroundColor Green
+    } else {
+        Write-Host "[Would prompt] Color theme selection" -ForegroundColor Yellow
+    }
+} elseif ($Defaults) {
+    $savedTheme = Get-DistroConfig "terminal.color_scheme"
+    if (-not [string]::IsNullOrWhiteSpace($savedTheme)) {
+        $SelectedTheme = $savedTheme
+        Write-Host "  [defaults] Reusing saved theme: $savedTheme" -ForegroundColor Yellow
+    } else {
+        Write-Host "  [defaults] Using One Half Dark." -ForegroundColor Yellow
     }
 }
 
@@ -403,7 +447,7 @@ if ($ubuntuClaudeExists) {
 
     $checkScript = @'
 echo "claude_user=$(id claude-user &>/dev/null && echo Y || echo N)"
-echo "sudo_rules=$(test -f /etc/sudoers.d/claude-user && echo Y || echo N)"
+echo "sudo_rules=$(grep -q 'apt' /etc/sudoers.d/claude-user 2>/dev/null && echo Y || echo N)"
 echo "wsl_conf=$(grep -q 'default.*=.*claude-user' /etc/wsl.conf 2>/dev/null && echo Y || echo N)"
 echo "dev_skills=$(test -d /home/claude-user/development-skills && echo Y || echo N)"
 echo "shared_dir=$(grep -q 'drvfs' /etc/fstab 2>/dev/null && echo Y || echo N)"
@@ -467,6 +511,7 @@ echo "ro_mount=$(grep -q 'options.*=.*ro' /etc/wsl.conf 2>/dev/null && echo Y ||
     if ($Defaults) {
         Write-Host "  [defaults] Applying updates: $defaultStr" -ForegroundColor Yellow
         $DoRepoSync = $true
+        $doSudoReconfig = $sudoMissing
         $doVSCodeSetup = $vscodeMissing
     } elseif ($DryRun) {
         Write-Host "  [dry-run] Would offer update menu (defaults: $defaultStr)" -ForegroundColor Yellow
@@ -786,6 +831,59 @@ if (-not $DryRun -and (Test-Path $SettingsDst)) {
     try {
         $settings = Get-Content $SettingsDst -Raw | ConvertFrom-Json
 
+        # --- Install Catppuccin color scheme if selected ---
+        if ($SelectedTheme -like "Catppuccin*") {
+            $catppuccinSchemes = @{
+                "Catppuccin Mocha" = @{
+                    "name" = "Catppuccin Mocha"; "cursorColor" = "#F5E0DC"; "selectionBackground" = "#585B70"
+                    "background" = "#1E1E2E"; "foreground" = "#CDD6F4"
+                    "black" = "#45475A"; "red" = "#F38BA8"; "green" = "#A6E3A1"; "yellow" = "#F9E2AF"
+                    "blue" = "#89B4FA"; "purple" = "#F5C2E7"; "cyan" = "#94E2D5"; "white" = "#BAC2DE"
+                    "brightBlack" = "#585B70"; "brightRed" = "#F38BA8"; "brightGreen" = "#A6E3A1"; "brightYellow" = "#F9E2AF"
+                    "brightBlue" = "#89B4FA"; "brightPurple" = "#F5C2E7"; "brightCyan" = "#94E2D5"; "brightWhite" = "#A6ADC8"
+                }
+                "Catppuccin Macchiato" = @{
+                    "name" = "Catppuccin Macchiato"; "cursorColor" = "#F4DBD6"; "selectionBackground" = "#5B6078"
+                    "background" = "#24273A"; "foreground" = "#CAD3F5"
+                    "black" = "#494D64"; "red" = "#ED8796"; "green" = "#A6DA95"; "yellow" = "#EED49F"
+                    "blue" = "#8AADF4"; "purple" = "#F5BDE6"; "cyan" = "#8BD5CA"; "white" = "#B8C0E0"
+                    "brightBlack" = "#5B6078"; "brightRed" = "#ED8796"; "brightGreen" = "#A6DA95"; "brightYellow" = "#EED49F"
+                    "brightBlue" = "#8AADF4"; "brightPurple" = "#F5BDE6"; "brightCyan" = "#8BD5CA"; "brightWhite" = "#A5ADCB"
+                }
+                "Catppuccin Frappe" = @{
+                    "name" = "Catppuccin Frappe"; "cursorColor" = "#F2D5CF"; "selectionBackground" = "#626880"
+                    "background" = "#303446"; "foreground" = "#C6D0F5"
+                    "black" = "#51576D"; "red" = "#E78284"; "green" = "#A6D189"; "yellow" = "#E5C890"
+                    "blue" = "#8CAAEE"; "purple" = "#F4B8E4"; "cyan" = "#81C8BE"; "white" = "#B5BFE2"
+                    "brightBlack" = "#626880"; "brightRed" = "#E78284"; "brightGreen" = "#A6D189"; "brightYellow" = "#E5C890"
+                    "brightBlue" = "#8CAAEE"; "brightPurple" = "#F4B8E4"; "brightCyan" = "#81C8BE"; "brightWhite" = "#A5ADCE"
+                }
+                "Catppuccin Latte" = @{
+                    "name" = "Catppuccin Latte"; "cursorColor" = "#DC8A78"; "selectionBackground" = "#ACB0BE"
+                    "background" = "#EFF1F5"; "foreground" = "#4C4F69"
+                    "black" = "#5C5F77"; "red" = "#D20F39"; "green" = "#40A02B"; "yellow" = "#DF8E1D"
+                    "blue" = "#1E66F5"; "purple" = "#EA76CB"; "cyan" = "#179299"; "white" = "#ACB0BE"
+                    "brightBlack" = "#ACB0BE"; "brightRed" = "#D20F39"; "brightGreen" = "#40A02B"; "brightYellow" = "#DF8E1D"
+                    "brightBlue" = "#1E66F5"; "brightPurple" = "#EA76CB"; "brightCyan" = "#179299"; "brightWhite" = "#BCC0CC"
+                }
+            }
+
+            $scheme = $catppuccinSchemes[$SelectedTheme]
+            if ($scheme) {
+                # Ensure schemes array exists
+                if (-not $settings.schemes) {
+                    $settings | Add-Member -NotePropertyName "schemes" -NotePropertyValue @() -Force
+                }
+                # Add or update the scheme
+                $existingScheme = $settings.schemes | Where-Object { $_.name -eq $SelectedTheme }
+                if (-not $existingScheme) {
+                    $schemeObj = New-Object PSObject -Property $scheme
+                    $settings.schemes += $schemeObj
+                    Write-Host "  Installed $SelectedTheme color scheme" -ForegroundColor Cyan
+                }
+            }
+        }
+
         $customProfileExists = $settings.profiles.list | Where-Object {
             $_.name -eq "Ubuntu-Claude" -and $_.commandline -like "*Ubuntu-Claude*"
         }
@@ -813,7 +911,7 @@ if (-not $DryRun -and (Test-Path $SettingsDst)) {
                 "hidden" = $false
                 "icon" = "ms-appdata:///roaming/claude-icon.ico"
                 "tabTitle" = "Claude (Sandboxed)"
-                "colorScheme" = "One Half Dark"
+                "colorScheme" = $SelectedTheme
                 "font" = @{
                     "face" = "JetBrainsMono Nerd Font"
                     "size" = 12
@@ -851,6 +949,10 @@ if (-not $DryRun -and (Test-Path $SettingsDst)) {
                     $existingProfile | Add-Member -NotePropertyName "backgroundImageOpacity" -NotePropertyValue 0.5 -Force
                     $updated += "backgroundImage"
                 }
+                if ($existingProfile.colorScheme -ne $SelectedTheme) {
+                    $existingProfile | Add-Member -NotePropertyName "colorScheme" -NotePropertyValue $SelectedTheme -Force
+                    $updated += "colorScheme"
+                }
                 if ($updated.Count -gt 0) {
                     $needsSave = $true
                     Write-Host "  Updated profile: $($updated -join ', ')" -ForegroundColor Cyan
@@ -864,12 +966,15 @@ if (-not $DryRun -and (Test-Path $SettingsDst)) {
             Copy-Item $SettingsDst "$SettingsDst.bak" -Force
             $settings | ConvertTo-Json -Depth 10 | Set-Content $SettingsDst -Encoding UTF8
         }
+
+        # Save theme choice to distro config
+        Set-DistroConfig "terminal.color_scheme" $SelectedTheme
     } catch {
         Write-Warning "Failed to update Windows Terminal settings: $($_.Exception.Message)"
     }
 } elseif ($DryRun -and (Test-Path $SettingsDst)) {
     Write-Host ""
-    Write-Host "[Would check] Windows Terminal profiles for Ubuntu-Claude" -ForegroundColor Yellow
+    Write-Host "[Would check] Windows Terminal profiles and color scheme for Ubuntu-Claude" -ForegroundColor Yellow
 }
 
 # --- Done ---
