@@ -24,51 +24,17 @@ $RoamingStateCheck = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8weky
 
 $ErrorActionPreference = "Stop"
 
-# --- Helper: Build sudoers content from option selection ---
-function Build-SudoersContent {
-    param([string]$SudoChoice)
-    $sudoOptions = $SudoChoice -split "," | ForEach-Object { $_.Trim() }
-    $lines = @("# Controlled sudo for claude-user (sandbox mode)")
-    if ($sudoOptions -contains "5" -or $sudoOptions -contains "1") {
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt-get install *"
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt install *"
-    }
-    if ($sudoOptions -contains "5" -or $sudoOptions -contains "2") {
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt-get update"
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt update"
-    }
-    if ($sudoOptions -contains "5" -or $sudoOptions -contains "3") {
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/systemctl *"
-    }
-    if ($sudoOptions -contains "5" -or $sudoOptions -contains "4") {
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/tee /etc/apt/sources.list.d/*"
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/tee /etc/apt/trusted.gpg.d/*"
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/add-apt-repository *"
-        $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/apt-key *"
-    }
-    $lines += "claude-user ALL=(root) NOPASSWD: /usr/bin/chsh *"
-    return $lines -join "`n"
-}
-
-# --- Helper: Prompt for sudo choice ---
-function Get-SudoChoice {
-    param([switch]$UseDefaults)
-    if ($UseDefaults) {
-        Write-Host "  [defaults] Sudo: 1,2,4" -ForegroundColor Yellow
-        return "1,2,4"
-    }
-    Write-Host "  Select which sudo commands to allow (comma-separated):" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "    1. apt-get install (install packages)"
-    Write-Host "    2. apt-get update (update package lists)"
-    Write-Host "    3. systemctl (manage services)"
-    Write-Host "    4. tee /etc/apt/* (write apt config files)"
-    Write-Host "    5. All of the above"
-    Write-Host ""
-    $choice = Read-Host "    Selection (default: 1,2,4)"
-    if ([string]::IsNullOrWhiteSpace($choice)) { $choice = "1,2,4" }
-    return $choice
-}
+# --- Sudoers content for claude-user ---
+# Full apt/apt-get access is safe in a sandbox: no escape vector, Windows
+# mounts are read-only, and the distro is disposable.
+$SudoersContent = @"
+# Controlled sudo for claude-user (sandbox mode)
+claude-user ALL=(root) NOPASSWD: /usr/bin/apt-get *
+claude-user ALL=(root) NOPASSWD: /usr/bin/apt *
+claude-user ALL=(root) NOPASSWD: /usr/bin/systemctl *
+claude-user ALL=(root) NOPASSWD: /usr/bin/add-apt-repository *
+claude-user ALL=(root) NOPASSWD: /usr/bin/chsh *
+"@
 
 # --- Helper: Apply sudoers to distro ---
 function Apply-Sudoers {
@@ -549,9 +515,7 @@ echo "ro_mount=$(grep -q 'options.*=.*ro' /etc/wsl.conf 2>/dev/null && echo Y ||
     # --- Reconfigure sudo if selected ---
     if ($doSudoReconfig -and -not $DryRun) {
         Write-Host "`nReconfiguring sudo permissions..." -ForegroundColor Cyan
-        $sudoChoice = Get-SudoChoice -UseDefaults:$Defaults
-        $sudoersContent = Build-SudoersContent $sudoChoice
-        Apply-Sudoers $sudoersContent
+        Apply-Sudoers $SudoersContent
         Write-Host "  Sudo permissions updated." -ForegroundColor Green
     } elseif ($doSudoReconfig -and $DryRun) {
         Write-Host "[Would reconfigure] sudo permissions" -ForegroundColor Yellow
@@ -658,11 +622,6 @@ Then re-run this script.
     # --- Configure Ubuntu-Claude ---
     Write-Host "Configuring Ubuntu-Claude..." -ForegroundColor Cyan
 
-    Write-Host ""
-    Write-Host "Sudo permissions for claude-user:" -ForegroundColor Yellow
-    $sudoChoice = Get-SudoChoice -UseDefaults:$Defaults
-    $sudoersContent = Build-SudoersContent $sudoChoice
-
     # Build shared directory mount line (expand PowerShell vars now, not inside bash)
     $fstabLine = ""
     $mountDir = ""
@@ -697,7 +656,7 @@ WSLCONF
 
 # Configure controlled sudo
 cat > /etc/sudoers.d/claude-user << 'SUDOERS'
-$sudoersContent
+$SudoersContent
 SUDOERS
 chmod 440 /etc/sudoers.d/claude-user
 
