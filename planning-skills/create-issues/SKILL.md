@@ -233,12 +233,24 @@ Use `mcp__gitea__create_issue`:
 {If this feature depends on another feature:}
 - Depends on #{other_issue_number} — {why}
 
-## Acceptance criteria
+## Test Criteria
 
-- [ ] {testable criterion from user perspective}
-- [ ] {testable criterion}
-- [ ] Tests pass
-- [ ] No regressions
+- [ ] [ai-verify] {testable criterion from user perspective — verifiable via API on dev}
+- [ ] [ai-verify] {testable criterion — verifiable via API on dev}
+- [ ] [local-test] Lint and type-check pass
+- [ ] [local-test] Unit/integration tests pass
+- [ ] [ci-check] CI pipeline passes
+- [ ] [subtask-check] All sub-issues are closed
+- [ ] [post-merge] {any prod-only verification — health check, DNS, Flux reconciliation, etc.}
+
+**Label guide for test criteria:**
+- `[ai-verify]` — AI tests this live against the dev API
+- `[local-test]` — runnable locally (lint, tests, build, type-check)
+- `[ci-check]` — verify CI/CD passed
+- `[subtask-check]` — all sub-issues and blockers completed
+- `[human-verify]` — requires human judgment (visual, UX, feel)
+- `[human-assist]` — AI sets up environment, human spot-checks
+- `[post-merge]` — can only be verified after merge to main (prod checks)
 ```
 - `milestone`: the milestone ID for this phase
 - `labels`: type label (`feature`, `enhancement`, or `bug`), plus a priority label (`priority: high`, `priority: medium`, or `priority: low` — based on milestone urgency and user impact)
@@ -299,11 +311,11 @@ Sub-issue of #{parent_feature_issue_number} — {parent title}
 {If this sub-issue can be done in parallel:}
 - No blockers — can be started immediately
 
-## Acceptance criteria
+## Test Criteria
 
-- [ ] {specific, testable criterion}
-- [ ] {specific, testable criterion}
-- [ ] All existing tests still pass
+- [ ] [ai-verify] {specific, testable criterion — verifiable via API on dev}
+- [ ] [local-test] All existing tests still pass
+- [ ] [ci-check] CI pipeline passes
 ```
 - `milestone`: same milestone as the parent feature
 - `labels`: `sub-issue`, `{sub-issue type}` (NO priority label — sub-issues inherit priority from their parent feature)

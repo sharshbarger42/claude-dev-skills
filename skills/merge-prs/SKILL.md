@@ -340,6 +340,66 @@ Body: PR #{pr_index} ({pr_title}) was merged but the deploy workflow failed.
 
 Create with `mcp__gitea__create_issue`, then label as `bug` + `priority: high` (same procedure as above).
 
+## Step 9.5: Verify `[post-merge]` criteria
+
+After health checks pass (or for repos without health checks), check whether the merged PR has `[post-merge]` test criteria that need verification on prod.
+
+### Discover post-merge criteria
+
+1. **Get the PR body** from the merge metadata (already fetched in Step 2)
+2. **Find linked issues**: Parse for `Closes #N` or `Fixes #N`
+3. **Fetch the linked issue** via `mcp__gitea__get_issue_by_index`
+4. **Parse the `## Test Criteria` section** for items labeled `[post-merge]`
+5. Also check the **QA PR comment** (if any) for items marked `pending-post-merge`
+
+### Execute post-merge criteria
+
+For each `[post-merge]` criterion:
+
+1. **Parse the verification method** from the criterion text:
+   - If it contains a command (backtick-wrapped), run it via Bash
+   - If it mentions a URL or endpoint, `curl` it
+   - If it mentions Flux/HelmRelease/pods, run `kubectl` commands
+   - If it mentions DNS, run `dig` or `nslookup`
+2. **Record the result** as passed/failed with the command output
+3. **Set `verified_on: prod`**
+
+### Post results on the issue
+
+If any `[post-merge]` criteria were found and executed, post a comment on the linked issue:
+
+```markdown
+✅ **Post-Merge Verification** — prod checks passed
+
+PR #{pr_index} was merged and deployed. Post-merge criteria verified:
+
+| Criterion | Env | Result |
+|-----------|-----|--------|
+| {criterion text} | prod | ✅ Pass |
+| ... | ... | ... |
+```
+
+If any fail:
+
+```markdown
+❌ **Post-Merge Verification** — prod issues found
+
+PR #{pr_index} was merged but some post-merge checks failed:
+
+| Criterion | Env | Result | Detail |
+|-----------|-----|--------|--------|
+| {criterion text} | prod | ❌ Fail | {error detail} |
+```
+
+Create a bug issue for any failed post-merge criteria (same pattern as health check failures in Step 9).
+
+### Update issue checklist
+
+For each `[post-merge]` criterion that **passed**, update the issue body:
+- Find the matching `- [ ] [post-merge]` line
+- Replace `- [ ]` with `- [x]`
+- Append: ` — *verified on prod after merge of PR #{pr_index}*`
+
 ## Step 10: Report
 
 For each PR that was in scope, report its final status:
@@ -347,12 +407,12 @@ For each PR that was in scope, report its final status:
 ```
 ## Merge Results
 
-| Repo | PR | Title | CI Fix | Merge | Deploy | Health | Issue |
-|------|----|-------|--------|-------|--------|--------|-------|
-| food-automation | #39 | refactor: enforce layer boundary | — | Merged (rebase, 1 commit) | Passed | Healthy | — |
-| homelab-setup | #45 | feat(#40): add monitoring stack | Fixed (ansible-lint) | Merged (squash, 4→1) | Failed | — | #46 created |
-| recipe-readiness | #8 | fix: parser edge case | — | Merged (rebase, 1 commit) | N/A | N/A | — |
-| food-automation | #40 | feat: new endpoint | — | Skipped | — | — | — (2 unaddressed comments) |
+| Repo | PR | Title | CI Fix | Merge | Deploy | Health | Post-Merge | Issue |
+|------|----|-------|--------|-------|--------|--------|------------|-------|
+| food-automation | #39 | refactor: enforce layer boundary | — | Merged (rebase, 1 commit) | Passed | Healthy | 2/2 passed | — |
+| homelab-setup | #45 | feat(#40): add monitoring stack | Fixed (ansible-lint) | Merged (squash, 4→1) | Failed | — | — | #46 created |
+| recipe-readiness | #8 | fix: parser edge case | — | Merged (rebase, 1 commit) | N/A | N/A | No criteria | — |
+| food-automation | #40 | feat: new endpoint | — | Skipped | — | — | — | — (2 unaddressed comments) |
 ```
 
 Keep the output concise. No fluff.

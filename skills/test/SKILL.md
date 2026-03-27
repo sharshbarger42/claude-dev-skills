@@ -80,9 +80,29 @@ Create a structured test plan document at `{repo}-{issue_number}-test-plan.md` i
 - [ ] {required config/secrets set}
 - [ ] {test data setup reviewed — see Phase 4}
 
+## Local Tests
+
+{List locally runnable checks discovered in Phase 2. Each gets a `[local-test]` label.}
+
+| Check | Command | Label |
+|-------|---------|-------|
+| Lint | `{lint command}` | `[local-test]` |
+| Type-check | `{type-check command}` | `[local-test]` |
+| Unit tests | `{test command}` | `[local-test]` |
+| Build | `{build command}` | `[local-test]` |
+
+## Pre-Merge Checks
+
+| Check | Label |
+|-------|-------|
+| CI pipeline passes | `[ci-check]` |
+| All subtasks/blockers closed | `[subtask-check]` |
+
 ## Test Steps
 
 ### 1. {Test scenario name}
+- **Label**: `[ai-verify]` / `[human-verify]` / `[human-assist]`
+- **Env**: `local` / `dev` / `prod`
 - **Precondition**: {what must be true before this step}
 - **Action**: {what to do — API call, CLI command, function call, UI action}
 - **Expected Result**: {what should happen}
@@ -94,8 +114,19 @@ Create a structured test plan document at `{repo}-{issue_number}-test-plan.md` i
 ## Negative / Edge Cases
 
 ### N1. {Error scenario}
+- **Label**: `[ai-verify]`
 - **Action**: {invalid input or error condition}
 - **Expected Result**: {appropriate error response or handling}
+
+## Post-Merge Checks
+
+{List any checks that can only be verified after merge to main. Each gets a `[post-merge]` label.}
+
+| Check | How to verify | Label |
+|-------|---------------|-------|
+| {prod health check} | `{command}` | `[post-merge]` |
+| {DNS resolves} | `dig {hostname}` | `[post-merge]` |
+| {Flux reconciles} | `kubectl get hr -n {ns}` | `[post-merge]` |
 
 ## Cleanup
 
@@ -170,14 +201,19 @@ After all tests are executed, update the test plan's Status field and append:
 ```markdown
 ## Results
 
-**Status**: {N} passed, {N} failed, {N} skipped, {N} blocked
+**Status**: {N} passed, {N} failed, {N} skipped, {N} blocked, {N} deferred (post-merge)
 **Executed**: {date and time}
 
-| Step | Name | Result | Notes |
-|------|------|--------|-------|
-| 1 | {name} | PASS | |
-| 2 | {name} | FAIL | Expected X, got Y |
-| N1 | {name} | PASS | |
+| Step | Name | Label | Env | Result | Notes |
+|------|------|-------|-----|--------|-------|
+| L1 | Lint | `[local-test]` | local | PASS | |
+| L2 | Unit tests | `[local-test]` | local | PASS | |
+| C1 | CI pipeline | `[ci-check]` | ci | PASS | |
+| S1 | Subtasks closed | `[subtask-check]` | n/a | PASS | |
+| 1 | {name} | `[ai-verify]` | dev | PASS | |
+| 2 | {name} | `[ai-verify]` | dev | FAIL | Expected X, got Y |
+| N1 | {name} | `[ai-verify]` | dev | PASS | |
+| P1 | {name} | `[post-merge]` | prod | DEFERRED | Verify after merge |
 ```
 
 If any tests failed, summarize failures and suggest next steps.

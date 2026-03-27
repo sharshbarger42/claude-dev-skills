@@ -265,20 +265,24 @@ If the PR body contains `Closes #N` or `Fixes #N`, extract the linked issue numb
 
 1. Parse the PR body for issue references matching `Closes #(\d+)` or `Fixes #(\d+)` (case-insensitive)
 2. If found, fetch the issue via `mcp__gitea__get_issue_by_index` with the parsed `owner`, `repo`, and issue `index`
-3. Parse the issue body for a `## Test Criteria` section
+3. Parse the issue body for a `## Test Criteria` section (also check `## Acceptance criteria` for older issues)
 4. Extract all checklist items (`- [ ] ...` and `- [x] ...`) from that section — these are the **issue test criteria**
 
 If no linked issue is found, or the issue has no Test Criteria section, proceed with smoke tests only.
 
 ### Test criteria labels
 
-Every test criterion in the issue MUST start with one of three labels. These labels are the **sole determinant** of how the QA skill handles that criterion — there is no AI triage or judgment call.
+Every test criterion in the issue MUST start with one of these labels. These labels are the **sole determinant** of how the QA skill handles that criterion — there is no AI triage or judgment call.
 
-| Label | Meaning | QA skill behavior |
-|-------|---------|-------------------|
-| `[ai-verify]` | Fully testable by AI via HTTP requests against the dev environment | **Execute and report pass/fail.** No exceptions — the AI must run the test. |
-| `[human-verify]` | Requires a human to verify (visual judgment, UX feel, interactive behavior) | **Skip execution.** Record as `pending`. The human will verify separately. |
-| `[human-assist]` | AI sets up the environment and tells the human what to look for | **Execute setup, then describe expected outcome.** AI creates test data, hits APIs, and records what the human should see in the browser. Recorded as `pending-human-check` until the human confirms. |
+| Label | Meaning | QA skill behavior | Verified on |
+|-------|---------|-------------------|-------------|
+| `[ai-verify]` | Fully testable by AI via HTTP requests against the dev environment | **Execute and report pass/fail.** No exceptions — the AI must run the test. | `dev` |
+| `[local-test]` | Locally runnable checks — lint, unit tests, build, type-check | **Run the command locally in the repo checkout and report pass/fail.** | `local` |
+| `[ci-check]` | Verify CI/CD pipeline passed for this PR | **Check action run status via Gitea API and report pass/fail.** | `ci` |
+| `[subtask-check]` | Verify all subtasks and/or blockers are completed | **Fetch linked issues, check all are closed. Report pass/fail.** | `n/a` |
+| `[human-verify]` | Requires a human to verify (visual judgment, UX feel, interactive behavior) | **Skip execution.** Record as `pending`. The human will verify separately. | — |
+| `[human-assist]` | AI sets up the environment and tells the human what to look for | **Execute setup, then describe expected outcome.** AI creates test data, hits APIs, and records what the human should see in the browser. Recorded as `pending-human-check` until the human confirms. | `dev` |
+| `[post-merge]` | Can only be verified after merge to main (prod health checks, DNS, Flux reconciliation) | **Skip execution.** Record as `pending-post-merge`. These are verified by `/merge-prs` after merge. | `prod` (after merge) |
 
 **Label rules:**
 - If a criterion has no label, treat it as `[ai-verify]` (default — the AI tests it)
@@ -287,11 +291,15 @@ Every test criterion in the issue MUST start with one of three labels. These lab
 
 ### Categorize criteria by label
 
-Split extracted criteria into three lists:
+Split extracted criteria into these lists:
 
-1. **`ai_verify`** — criteria labeled `[ai-verify]` (or unlabeled). These MUST be executed.
-2. **`human_verify`** — criteria labeled `[human-verify]`. These are recorded as pending.
-3. **`human_assist`** — criteria labeled `[human-assist]`. The AI sets up the environment and documents what the human should see.
+1. **`ai_verify`** — criteria labeled `[ai-verify]` (or unlabeled). These MUST be executed against dev.
+2. **`local_test`** — criteria labeled `[local-test]`. These MUST be executed locally in the repo checkout.
+3. **`ci_check`** — criteria labeled `[ci-check]`. These MUST be verified via Gitea API.
+4. **`subtask_check`** — criteria labeled `[subtask-check]`. These MUST be verified via Gitea API.
+5. **`human_verify`** — criteria labeled `[human-verify]`. These are recorded as pending.
+6. **`human_assist`** — criteria labeled `[human-assist]`. The AI sets up the environment and documents what the human should see.
+7. **`post_merge`** — criteria labeled `[post-merge]`. These are recorded as pending-post-merge.
 
 ### Step 6.7: Plan test execution
 
@@ -366,6 +374,58 @@ After running smoke tests, execute the issue test criteria by label. Follow the 
 4. **Mark the criterion source as `issue`** and label as `ai-verify`.
 5. **There is no "skipped" status.** Every `[ai-verify]` criterion must be either `passed` or `failed`. Infrastructure issues (endpoint down, 500 error) = `failed`.
 
+#### `[local-test]` criteria — run locally and report
+
+1. **Resolve the repo's local path** from the shorthand table (same as fix-pr).
+2. **Check out the PR branch** locally:
+   ```bash
+   cd {local_path}
+   git fetch origin
+   git checkout {head_branch} && git pull origin {head_branch}
+   ```
+3. **For each `[local-test]` criterion**, parse what to run:
+   - If the criterion text contains a command (backtick-wrapped or after "run:"), execute that exact command
+   - If it says "lint" or "linting", detect the project's linter from config files (`ruff` for Python, `eslint` for JS/TS, `ansible-lint` for Ansible, `yamllint` for YAML) and run it
+   - If it says "tests" or "unit tests", detect the test runner (`pytest`, `npm test`, `go test`, `cargo test`) and run it
+   - If it says "build" or "type-check", detect the build command (`npm run build`, `tsc --noEmit`, `go build ./...`) and run it
+4. **Record result** as `passed` (exit code 0) or `failed` (non-zero exit code). Include truncated stdout/stderr (500 chars max).
+5. **Set `verified_on: local`** for each result.
+
+#### `[ci-check]` criteria — verify CI passed
+
+1. **Run the shared check-ci procedure** (same as merge-prs Step 4):
+   - Re-fetch the PR for fresh HEAD SHA
+   - Check commit statuses and cross-reference with action runs
+2. **Record result:**
+   - CI `passed` → criterion passes
+   - CI `failed` → criterion fails, include failing workflow name and run URL
+   - CI `running` → criterion recorded as `pending-ci` (still in progress)
+   - CI `no-ci` → criterion passes (no CI configured for this repo)
+3. **Set `verified_on: ci`** for each result.
+
+#### `[subtask-check]` criteria — verify subtasks and blockers completed
+
+1. **Parse the PR body and linked issue body** for issue references:
+   - Look for `Sub-issue of #N`, `Blocked by #N`, `Depends on #N`, `Part of #N`
+   - Look for checklist items with `#N` references (e.g., `- [ ] #42 — description`)
+   - Look for a `## Sub-tasks` or `## Dependencies` section with issue links
+2. **Fetch each referenced issue** via `mcp__gitea__get_issue_by_index`
+3. **Check status:**
+   - If the issue is `closed` → OK
+   - If the issue is `open` with label `status: done` → OK
+   - Otherwise → blocker not resolved
+4. **Record result:**
+   - All referenced issues closed → criterion passes
+   - Any open blockers → criterion fails, list the open issues by number and title
+5. **Set `verified_on: n/a`** for each result.
+
+#### `[post-merge]` criteria — record as pending
+
+These cannot be executed before merge. For each `[post-merge]` criterion:
+1. **Record as `pending-post-merge`** with a note that this will be verified after merge by `/merge-prs`.
+2. **Set `verified_on: prod (pending)`**.
+3. Include the criterion text verbatim so it can be picked up by the post-merge verification step.
+
 #### `[human-assist]` criteria — set up environment, then describe
 
 1. **Execute all setup steps** — create test data, make API calls, put the system into the state the criterion requires. This is AI work.
@@ -396,19 +456,32 @@ These are NOT executed. Record each as `pending` with a note that human signoff 
 
 ### Collecting results
 
-Build a results list. The `passed` field has four possible values:
-- `true` — test executed and passed (smoke tests + `[ai-verify]`)
-- `false` — test executed and failed (smoke tests + `[ai-verify]` + `[human-assist]` setup failure)
+Build a results list. The `passed` field has these possible values:
+- `true` — test executed and passed (smoke tests + `[ai-verify]` + `[local-test]` + `[ci-check]` + `[subtask-check]`)
+- `false` — test executed and failed (any automated criterion)
 - `"pending-human-check"` — `[human-assist]` criterion where AI setup succeeded, awaiting human confirmation
 - `"pending"` — `[human-verify]` criterion (never executed)
+- `"pending-post-merge"` — `[post-merge]` criterion (cannot run until after merge to main)
+- `"pending-ci"` — `[ci-check]` criterion where CI is still running
+
+Every result MUST include a `verified_on` field indicating where the test was executed:
+- `"local"` — ran in local repo checkout (`[local-test]`)
+- `"dev"` — ran against dev environment (`[ai-verify]`, `[human-assist]`, smoke tests)
+- `"ci"` — verified via CI/CD pipeline status (`[ci-check]`)
+- `"prod"` — verified on production (only after merge, used by `/merge-prs`)
+- `"n/a"` — not environment-specific (`[subtask-check]`, `[human-verify]`)
 
 ```
 [
-  { "name": "Health check", "source": "smoke", "label": "smoke", "endpoint": "/api/health", "status": 200, "passed": true, "detail": "" },
-  { "name": "Task list", "source": "smoke", "label": "smoke", "endpoint": "/api/tasks", "status": 500, "passed": false, "detail": "Internal server error: database locked" },
-  { "name": "Stuck task in action-required", "source": "issue", "label": "ai-verify", "endpoint": "/api/action-required", "status": 200, "passed": true, "detail": "Created stuck task, confirmed in action-required with source:'stuck'" },
-  { "name": "Warning indicator on stuck task card", "source": "issue", "label": "human-assist", "endpoint": "-", "status": "-", "passed": "pending-human-check", "detail": "Setup: created stuck task dd-test-1. Human: open dashboard, check coding column for warning badge." },
-  { "name": "Human verification: UX feels intuitive", "source": "issue", "label": "human-verify", "endpoint": "-", "status": "-", "passed": "pending", "detail": "Owner confirms fix works" },
+  { "name": "Health check", "source": "smoke", "label": "smoke", "endpoint": "/api/health", "status": 200, "passed": true, "verified_on": "dev", "detail": "" },
+  { "name": "Task list", "source": "smoke", "label": "smoke", "endpoint": "/api/tasks", "status": 500, "passed": false, "verified_on": "dev", "detail": "Internal server error: database locked" },
+  { "name": "Lint passes", "source": "issue", "label": "local-test", "endpoint": "-", "status": "-", "passed": true, "verified_on": "local", "detail": "ruff check . — exit 0" },
+  { "name": "CI pipeline passes", "source": "issue", "label": "ci-check", "endpoint": "-", "status": "-", "passed": true, "verified_on": "ci", "detail": "All 3 action runs passed" },
+  { "name": "All subtasks closed", "source": "issue", "label": "subtask-check", "endpoint": "-", "status": "-", "passed": false, "verified_on": "n/a", "detail": "#42 still open: 'Add error handling'" },
+  { "name": "Stuck task in action-required", "source": "issue", "label": "ai-verify", "endpoint": "/api/action-required", "status": 200, "passed": true, "verified_on": "dev", "detail": "Created stuck task, confirmed in action-required with source:'stuck'" },
+  { "name": "Warning indicator on stuck task card", "source": "issue", "label": "human-assist", "endpoint": "-", "status": "-", "passed": "pending-human-check", "verified_on": "dev", "detail": "Setup: created stuck task dd-test-1. Human: open dashboard, check coding column for warning badge." },
+  { "name": "Human verification: UX feels intuitive", "source": "issue", "label": "human-verify", "endpoint": "-", "status": "-", "passed": "pending", "verified_on": "n/a", "detail": "Owner confirms fix works" },
+  { "name": "Flux reconciles within 10m", "source": "issue", "label": "post-merge", "endpoint": "-", "status": "-", "passed": "pending-post-merge", "verified_on": "prod (pending)", "detail": "Verify after merge: kubectl get hr -n registry-cache" },
   ...
 ]
 ```
@@ -419,12 +492,12 @@ Compose and post a PR comment using `mcp__gitea__create_issue_comment` with the 
 
 ### Compute overall verdict
 
-The verdict is determined by smoke tests + `[ai-verify]` criteria only. `[human-assist]` and `[human-verify]` criteria do not block the verdict — they are reported separately.
+The verdict is determined by all automated criteria: smoke tests + `[ai-verify]` + `[local-test]` + `[ci-check]` + `[subtask-check]`. Non-blocking criteria (`[human-assist]`, `[human-verify]`, `[post-merge]`) are reported separately but do not affect the verdict.
 
-- **QA Passed** — every smoke test and `[ai-verify]` criterion passed. `[human-assist]` setups succeeded (but human confirmation still needed). Ready for merge pending human checks.
-- **QA Failed** — one or more smoke tests or `[ai-verify]` criteria failed, OR a `[human-assist]` setup failed (AI couldn't create the test conditions).
+- **QA Passed** — every smoke test, `[ai-verify]`, `[local-test]`, `[ci-check]`, and `[subtask-check]` criterion passed. `[human-assist]` setups succeeded (but human confirmation still needed). Ready for merge pending human checks and post-merge verification.
+- **QA Failed** — one or more automated criteria failed, OR a `[human-assist]` setup failed (AI couldn't create the test conditions).
 
-There is no "Partial" or "Skipped" verdict. Every `[ai-verify]` criterion is either tested and passed, or tested and failed.
+There is no "Partial" or "Skipped" verdict. Every automated criterion is either tested and passed, or tested and failed. `[post-merge]` criteria are always deferred.
 
 ### Deploy summary line
 
@@ -436,13 +509,21 @@ The `{deploy_summary}` should reflect what happened:
 ### If ALL automated tests passed
 
 ```markdown
-✅ **QA Passed** — dev deployment verified
+✅ **QA Passed** — verified across local, CI, and dev
 
 **Branch:** `{head_branch}` ({head_sha_short})
 **Deploy:** {deploy_summary}
-**Environment:** dev
 
-### Smoke Tests
+### Pre-Deploy Checks
+
+| Test | Type | Env | Result |
+|------|------|-----|--------|
+| Lint passes | `[local-test]` | local | ✅ Pass |
+| Unit tests pass | `[local-test]` | local | ✅ Pass |
+| CI pipeline passes | `[ci-check]` | ci | ✅ Pass |
+| All subtasks closed | `[subtask-check]` | n/a | ✅ Pass |
+
+### Smoke Tests (dev)
 
 | Test | Endpoint | Status | Result |
 |------|----------|--------|--------|
@@ -450,7 +531,7 @@ The `{deploy_summary}` should reflect what happened:
 | Task list | `/api/tasks` | 200 | ✅ Pass |
 | ... | ... | ... | ... |
 
-### `[ai-verify]` — Automated Criteria
+### `[ai-verify]` — Automated Criteria (dev)
 
 | Criterion | Endpoint | Status | Result |
 |-----------|----------|--------|--------|
@@ -473,21 +554,35 @@ The `{deploy_summary}` should reflect what happened:
 | {criterion text} | ⏳ Pending |
 | ... | ... |
 
+### `[post-merge]` — Verify After Merge (prod)
+
+| Criterion | How to verify | Status |
+|-----------|---------------|--------|
+| {criterion text} | {verification command or check} | ⏳ Pending merge |
+| ... | ... | ... |
+
 ---
 
-All {ai_count} automated tests passed. {human_assist_count} criteria ready for human spot-check. {human_verify_count} criteria awaiting human signoff.
+All {automated_count} automated tests passed ({local_count} local, {ci_count} CI, {dev_count} dev). {human_assist_count} criteria ready for human spot-check. {human_verify_count} criteria awaiting human signoff. {post_merge_count} criteria deferred to post-merge.
 ```
 
 ### If ANY automated tests failed
 
 ```markdown
-❌ **QA Failed** — dev deployment has issues
+❌ **QA Failed** — issues found
 
 **Branch:** `{head_branch}` ({head_sha_short})
 **Deploy:** {deploy_summary}
-**Environment:** dev
 
-### Smoke Tests
+### Pre-Deploy Checks
+
+| Test | Type | Env | Result |
+|------|------|-----|--------|
+| Lint passes | `[local-test]` | local | ✅ Pass / ❌ Fail |
+| CI pipeline passes | `[ci-check]` | ci | ✅ Pass / ❌ Fail |
+| All subtasks closed | `[subtask-check]` | n/a | ✅ Pass / ❌ Fail |
+
+### Smoke Tests (dev)
 
 | Test | Endpoint | Status | Result |
 |------|----------|--------|--------|
@@ -495,7 +590,7 @@ All {ai_count} automated tests passed. {human_assist_count} criteria ready for h
 | Task list | `/api/tasks` | 500 | ❌ Fail |
 | ... | ... | ... | ... |
 
-### `[ai-verify]` — Automated Criteria
+### `[ai-verify]` — Automated Criteria (dev)
 
 | Criterion | Endpoint | Status | Result |
 |-----------|----------|--------|--------|
@@ -504,9 +599,9 @@ All {ai_count} automated tests passed. {human_assist_count} criteria ready for h
 
 ### Failures
 
-**{test name}** (`{endpoint}`) — HTTP {status}
+**{test name}** ({env}) — {error summary}
 ```
-{truncated response body or error message}
+{truncated output or error message}
 ```
 
 ### `[human-assist]` — Environment Prepared, Awaiting Human Check
@@ -518,6 +613,12 @@ All {ai_count} automated tests passed. {human_assist_count} criteria ready for h
 | Criterion | Status |
 |-----------|--------|
 | {criterion text} | ⏳ Pending |
+
+### `[post-merge]` — Verify After Merge (prod)
+
+| Criterion | How to verify | Status |
+|-----------|---------------|--------|
+| {criterion text} | {verification command or check} | ⏳ Pending merge |
 
 ---
 
@@ -542,7 +643,7 @@ The deploy workflow failed before smoke tests could run. Check the [workflow run
 
 After posting the PR comment, update the PR's status label:
 
-- **QA passed, no `[human-assist]` or `[human-verify]` criteria** → set `pr: ready-to-merge`
+- **QA passed, no `[human-assist]` or `[human-verify]` criteria pending** → set `pr: ready-to-merge` (even if `[post-merge]` criteria exist — those are verified after merge by `/merge-prs`)
 - **QA passed, but `[human-assist]` or `[human-verify]` criteria pending** → keep `pr: needs-qa` (human steps remaining)
 - **QA failed** → set `pr: comments-pending` (needs fixes before re-test)
 
@@ -639,13 +740,17 @@ Skip this step entirely — only post the PR comment from Step 8.
 
 After posting the PR comment, tell the user:
 1. Whether QA passed or failed
-2. Breakdown by label type:
-   - **Smoke tests:** {passed}/{total}
-   - **`[ai-verify]`:** {passed}/{total}
+2. Breakdown by environment and label type:
+   - **Local** (`[local-test]`): {passed}/{total}
+   - **CI** (`[ci-check]`): {passed}/{total}
+   - **Pre-merge checks** (`[subtask-check]`): {passed}/{total}
+   - **Dev** (smoke tests + `[ai-verify]`): {passed}/{total}
    - **`[human-assist]`:** {setup_succeeded}/{total} ready for human spot-check
    - **`[human-verify]`:** {count} pending human signoff
+   - **`[post-merge]`:** {count} deferred to post-merge verification
 3. Link to the PR comment
 4. If a linked issue was found: link to the issue comment and current label status
 5. If failed, a brief summary of what broke
 6. If `[human-assist]` criteria exist, remind the user to check them — they have instructions in the PR/issue comments
 7. If `[human-verify]` criteria exist, remind that human signoff is needed before merge
+8. If `[post-merge]` criteria exist, note that `/merge-prs` will verify them after merge
