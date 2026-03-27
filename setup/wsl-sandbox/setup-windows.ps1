@@ -25,9 +25,7 @@ $RoamingStateCheck = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8weky
 $ErrorActionPreference = "Stop"
 
 # --- Sudoers content for claude-user ---
-# Full apt/apt-get access is safe in a sandbox: no escape vector, Windows
-# mounts are read-only, and the distro is disposable.
-$SudoersContent = @"
+$ControlledSudoersContent = @"
 # Controlled sudo for claude-user (sandbox mode)
 claude-user ALL=(root) NOPASSWD: /usr/bin/apt-get *
 claude-user ALL=(root) NOPASSWD: /usr/bin/apt *
@@ -36,16 +34,100 @@ claude-user ALL=(root) NOPASSWD: /usr/bin/add-apt-repository *
 claude-user ALL=(root) NOPASSWD: /usr/bin/chsh *
 "@
 
+# Full sudo with deny list — covers obvious bypass paths. Not unbreakable
+# (e.g. a newly-installed shell wouldn't be denied), but sufficient for an
+# AI agent that isn't actively trying to escape.
+$FullSudoersContent = @"
+# Full sudo for claude-user with sandbox guardrails
+# Critical files are also protected with chattr +i
+
+# Tools that remove immutable flags
+Cmnd_Alias IMMUTABLE_TOOLS = /usr/bin/chattr, /usr/sbin/debugfs, /usr/sbin/tune2fs, /usr/sbin/e2fsck, /usr/sbin/e2image
+
+# Shells — sudo bash gives unrestricted root, bypassing all deny rules
+Cmnd_Alias SHELLS = /usr/bin/bash, /bin/bash, /usr/bin/sh, /bin/sh, /usr/bin/dash, /usr/bin/zsh, /usr/bin/fish, /usr/bin/csh, /usr/bin/tcsh, /usr/bin/ksh
+
+# Interpreters — can call chattr internally when run as root
+Cmnd_Alias INTERPRETERS = /usr/bin/python3, /usr/bin/python3.*, /usr/bin/python, /usr/bin/perl, /usr/bin/ruby, /usr/bin/node, /usr/bin/nodejs, /usr/bin/php
+
+# Wrappers that can spawn unrestricted root shells
+Cmnd_Alias SHELL_WRAPPERS = /usr/bin/su, /usr/bin/env, /usr/bin/script, /usr/bin/expect, /usr/bin/chroot, /usr/bin/nsenter, /usr/bin/unshare, /usr/bin/runuser, /usr/bin/screen, /usr/bin/tmux, /usr/bin/ssh
+
+# Debug/tracing tools that can inject into processes
+Cmnd_Alias DEBUG_TOOLS = /usr/bin/gdb, /usr/bin/strace, /usr/bin/ltrace
+
+# Mount manipulation — could remount filesystems read-write
+Cmnd_Alias MOUNT_TOOLS = /usr/bin/mount, /bin/mount, /usr/bin/umount, /bin/umount, /usr/sbin/losetup
+
+# User/sudoers management
+Cmnd_Alias USER_MGMT = /usr/sbin/visudo, /usr/sbin/usermod, /usr/sbin/adduser, /usr/sbin/useradd, /usr/bin/passwd, /usr/bin/crontab, /usr/bin/at
+
+claude-user ALL=(ALL) NOPASSWD: ALL, !IMMUTABLE_TOOLS, !SHELLS, !INTERPRETERS, !SHELL_WRAPPERS, !DEBUG_TOOLS, !MOUNT_TOOLS, !USER_MGMT
+"@
+
+# --- Helper: Prompt for sudo mode ---
+function Get-SudoMode {
+    param([switch]$UseDefaults)
+    $savedMode = Get-DistroConfig "sudo.mode"
+    if (-not [string]::IsNullOrWhiteSpace($savedMode)) {
+        if ($UseDefaults) {
+            Write-Host "  [defaults] Reusing saved sudo mode: $savedMode" -ForegroundColor Yellow
+            return $savedMode
+        }
+        Write-Host ""
+        Write-Host "Sudo Mode" -ForegroundColor Cyan
+        Write-Host "  Already configured: $savedMode" -ForegroundColor Green
+        return $savedMode
+    }
+    if ($UseDefaults) {
+        Write-Host "  [defaults] Sudo mode: controlled" -ForegroundColor Yellow
+        return "controlled"
+    }
+    Write-Host ""
+    Write-Host "Sudo Mode" -ForegroundColor Cyan
+    Write-Host "    1. Controlled — apt, systemctl, chsh only (default)" -ForegroundColor Yellow
+    Write-Host "    2. Full — unrestricted with sandbox guardrails" -ForegroundColor Yellow
+    Write-Host "       (all commands allowed, but shells/interpreters/chattr" -ForegroundColor DarkGray
+    Write-Host "        denied and critical config files made immutable)" -ForegroundColor DarkGray
+    Write-Host ""
+    $choice = Read-Host "    Selection (default: 1)"
+    if ($choice -eq "2") { return "full" }
+    return "controlled"
+}
+
+# --- Helper: Get sudoers content for a given mode ---
+function Get-SudoersForMode {
+    param([string]$Mode)
+    if ($Mode -eq "full") { return $FullSudoersContent }
+    return $ControlledSudoersContent
+}
+
 # --- Helper: Apply sudoers to distro ---
 function Apply-Sudoers {
-    param([string]$Content)
+    param([string]$Content, [string]$Mode)
+    $immutableCmds = ""
+    if ($Mode -eq "full") {
+        $immutableCmds = @"
+
+# Lock down critical config files
+chattr +i /etc/wsl.conf
+chattr +i /etc/sudoers.d/claude-user
+chattr +i /etc/fstab
+"@
+    }
     $script = @"
 #!/bin/bash
 set -e
+# Remove immutable flags first (idempotent — ignore errors if not set)
+chattr -i /etc/sudoers.d/claude-user 2>/dev/null || true
+chattr -i /etc/wsl.conf 2>/dev/null || true
+chattr -i /etc/fstab 2>/dev/null || true
+
 cat > /etc/sudoers.d/claude-user << 'SUDOERS'
 $Content
 SUDOERS
 chmod 440 /etc/sudoers.d/claude-user
+$immutableCmds
 "@
     $script | Invoke-Wsl -d Ubuntu-Claude -u root -- bash -c "tr -d '\r' > /tmp/reconfig-sudo.sh"
     Invoke-Wsl -d Ubuntu-Claude -u root -- bash /tmp/reconfig-sudo.sh
@@ -441,10 +523,12 @@ echo "ro_mount=$(grep -q 'options.*=.*ro' /etc/wsl.conf 2>/dev/null && echo Y ||
     }
 
     # Display status table
+    $savedSudoMode = Get-DistroConfig "sudo.mode"
+    $sudoLabel = if (-not [string]::IsNullOrWhiteSpace($savedSudoMode)) { "sudo permissions ($savedSudoMode)" } else { "sudo permissions" }
     $labels = [ordered]@{
         "claude_user" = "claude-user account"
         "wsl_conf"    = "wsl.conf"
-        "sudo_rules"  = "sudo permissions"
+        "sudo_rules"  = $sudoLabel
         "dev_skills"  = "development-skills repo"
         "shared_dir"  = "shared directory"
         "ro_mount"    = "readonly Windows mount"
@@ -515,8 +599,11 @@ echo "ro_mount=$(grep -q 'options.*=.*ro' /etc/wsl.conf 2>/dev/null && echo Y ||
     # --- Reconfigure sudo if selected ---
     if ($doSudoReconfig -and -not $DryRun) {
         Write-Host "`nReconfiguring sudo permissions..." -ForegroundColor Cyan
-        Apply-Sudoers $SudoersContent
-        Write-Host "  Sudo permissions updated." -ForegroundColor Green
+        $sudoMode = Get-SudoMode -UseDefaults:$Defaults
+        $sudoContent = Get-SudoersForMode $sudoMode
+        Apply-Sudoers $sudoContent $sudoMode
+        Set-DistroConfig "sudo.mode" $sudoMode
+        Write-Host "  Sudo permissions updated ($sudoMode mode)." -ForegroundColor Green
     } elseif ($doSudoReconfig -and $DryRun) {
         Write-Host "[Would reconfigure] sudo permissions" -ForegroundColor Yellow
     }
@@ -529,6 +616,9 @@ echo "ro_mount=$(grep -q 'options.*=.*ro' /etc/wsl.conf 2>/dev/null && echo Y ||
         $roMountScript = @'
 #!/bin/bash
 set -e
+# Remove immutable flag if set (needed for full-sudo mode)
+chattr -i /etc/wsl.conf 2>/dev/null || true
+
 # Idempotent automount config — use python3 to safely rewrite the INI section
 python3 -c "
 import configparser, os
@@ -542,6 +632,11 @@ conf.set('automount', 'options', 'ro,metadata')
 with open('/etc/wsl.conf', 'w') as f:
     conf.write(f)
 "
+
+# Restore immutable flag if full-sudo mode
+if grep -q 'NOPASSWD: ALL' /etc/sudoers.d/claude-user 2>/dev/null; then
+    chattr +i /etc/wsl.conf
+fi
 '@
         $roMountScript | Invoke-Wsl -d Ubuntu-Claude -u root -- bash -c "tr -d '\r' > /tmp/setup-ro-mount.sh"
         Invoke-Wsl -d Ubuntu-Claude -u root -- bash /tmp/setup-ro-mount.sh
@@ -585,7 +680,7 @@ if (-not $ubuntuClaudeExists -and $DryRun) {
         Write-Host "  Export Ubuntu -> C:\wsl-exports\ubuntu-base.tar" -ForegroundColor Yellow
         Write-Host "  Import as Ubuntu-Claude -> C:\wsl-instances\ubuntu-claude" -ForegroundColor Yellow
         Write-Host "[Would configure] claude-user account, wsl.conf, sudoers" -ForegroundColor Yellow
-        Write-Host "[Would prompt] Sudo permission selection" -ForegroundColor Yellow
+        Write-Host "[Would prompt] Sudo mode selection (controlled or full)" -ForegroundColor Yellow
         Write-Host "[Would configure] VS Code symlink + readonly Windows mount" -ForegroundColor Yellow
     }
 }
@@ -622,6 +717,9 @@ Then re-run this script.
     # --- Configure Ubuntu-Claude ---
     Write-Host "Configuring Ubuntu-Claude..." -ForegroundColor Cyan
 
+    $sudoMode = Get-SudoMode -UseDefaults:$Defaults
+    $sudoContent = Get-SudoersForMode $sudoMode
+
     # Build shared directory mount line (expand PowerShell vars now, not inside bash)
     $fstabLine = ""
     $mountDir = ""
@@ -654,9 +752,9 @@ options=ro,metadata
 appendWindowsPath=false
 WSLCONF
 
-# Configure controlled sudo
+# Configure sudo
 cat > /etc/sudoers.d/claude-user << 'SUDOERS'
-$SudoersContent
+$sudoContent
 SUDOERS
 chmod 440 /etc/sudoers.d/claude-user
 
@@ -668,11 +766,19 @@ if [[ -n "$fstabLine" ]]; then
     fi
 fi
 
+$(if ($sudoMode -eq "full") { @"
+# Lock down critical config files (immutable even to root)
+chattr +i /etc/wsl.conf
+chattr +i /etc/sudoers.d/claude-user
+chattr +i /etc/fstab
+"@ } else { "# Controlled mode — no immutable flags needed" })
+
 # Lock the Windows user account inside this distro
 passwd -l $WinUser 2>/dev/null || true
 "@
     $setupScript | Invoke-Wsl -d Ubuntu-Claude -u root -- bash -c "tr -d '\r' > /tmp/setup-distro.sh"
     Invoke-Wsl -d Ubuntu-Claude -u root -- bash /tmp/setup-distro.sh
+    Set-DistroConfig "sudo.mode" $sudoMode
 
     # --- Set up VS Code symlink ---
     Write-Host "Setting up VS Code integration..." -ForegroundColor Cyan
