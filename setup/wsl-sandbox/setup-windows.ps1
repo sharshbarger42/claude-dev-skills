@@ -34,7 +34,7 @@ claude-user ALL=(root) NOPASSWD: /usr/bin/add-apt-repository *
 claude-user ALL=(root) NOPASSWD: /usr/bin/chsh *
 "@
 
-# Full sudo with deny list — covers obvious bypass paths. Not unbreakable
+# Full sudo with deny list -- covers obvious bypass paths. Not unbreakable
 # (e.g. a newly-installed shell wouldn't be denied), but sufficient for an
 # AI agent that isn't actively trying to escape.
 $FullSudoersContent = @"
@@ -44,10 +44,10 @@ $FullSudoersContent = @"
 # Tools that remove immutable flags
 Cmnd_Alias IMMUTABLE_TOOLS = /usr/bin/chattr, /usr/sbin/debugfs, /usr/sbin/tune2fs, /usr/sbin/e2fsck, /usr/sbin/e2image
 
-# Shells — sudo bash gives unrestricted root, bypassing all deny rules
+# Shells -- sudo bash gives unrestricted root, bypassing all deny rules
 Cmnd_Alias SHELLS = /usr/bin/bash, /bin/bash, /usr/bin/sh, /bin/sh, /usr/bin/dash, /usr/bin/zsh, /usr/bin/fish, /usr/bin/csh, /usr/bin/tcsh, /usr/bin/ksh
 
-# Interpreters — can call chattr internally when run as root
+# Interpreters -- can call chattr internally when run as root
 Cmnd_Alias INTERPRETERS = /usr/bin/python3, /usr/bin/python3.*, /usr/bin/python, /usr/bin/perl, /usr/bin/ruby, /usr/bin/node, /usr/bin/nodejs, /usr/bin/php
 
 # Wrappers that can spawn unrestricted root shells
@@ -56,7 +56,7 @@ Cmnd_Alias SHELL_WRAPPERS = /usr/bin/su, /usr/bin/env, /usr/bin/script, /usr/bin
 # Debug/tracing tools that can inject into processes
 Cmnd_Alias DEBUG_TOOLS = /usr/bin/gdb, /usr/bin/strace, /usr/bin/ltrace
 
-# Mount manipulation — could remount filesystems read-write
+# Mount manipulation -- could remount filesystems read-write
 Cmnd_Alias MOUNT_TOOLS = /usr/bin/mount, /bin/mount, /usr/bin/umount, /bin/umount, /usr/sbin/losetup
 
 # User/sudoers management
@@ -85,8 +85,8 @@ function Get-SudoMode {
     }
     Write-Host ""
     Write-Host "Sudo Mode" -ForegroundColor Cyan
-    Write-Host "    1. Controlled — apt, systemctl, chsh only (default)" -ForegroundColor Yellow
-    Write-Host "    2. Full — unrestricted with sandbox guardrails" -ForegroundColor Yellow
+    Write-Host "    1. Controlled -- apt, systemctl, chsh only (default)" -ForegroundColor Yellow
+    Write-Host "    2. Full -- unrestricted with sandbox guardrails" -ForegroundColor Yellow
     Write-Host "       (all commands allowed, but shells/interpreters/chattr" -ForegroundColor DarkGray
     Write-Host "        denied and critical config files made immutable)" -ForegroundColor DarkGray
     Write-Host ""
@@ -118,7 +118,7 @@ chattr +i /etc/fstab
     $script = @"
 #!/bin/bash
 set -e
-# Remove immutable flags first (idempotent — ignore errors if not set)
+# Remove immutable flags first (idempotent -- ignore errors if not set)
 chattr -i /etc/sudoers.d/claude-user 2>/dev/null || true
 chattr -i /etc/wsl.conf 2>/dev/null || true
 chattr -i /etc/fstab 2>/dev/null || true
@@ -619,7 +619,7 @@ set -e
 # Remove immutable flag if set (needed for full-sudo mode)
 chattr -i /etc/wsl.conf 2>/dev/null || true
 
-# Idempotent automount config — use python3 to safely rewrite the INI section
+# Idempotent automount config -- use python3 to safely rewrite the INI section
 python3 -c "
 import configparser, os
 conf = configparser.ConfigParser()
@@ -728,6 +728,18 @@ Then re-run this script.
         $mountDir = $SharedMountPoint
     }
 
+    # Build chattr block conditionally (avoids heredoc-in-subexpression issues)
+    $chattrBlock = ""
+    if ($sudoMode -eq "full") {
+        $chattrBlock = @"
+
+# Lock down critical config files (immutable even to root)
+chattr +i /etc/wsl.conf
+chattr +i /etc/sudoers.d/claude-user
+chattr +i /etc/fstab
+"@
+    }
+
     $setupScript = @"
 #!/bin/bash
 set -e
@@ -758,20 +770,14 @@ $sudoContent
 SUDOERS
 chmod 440 /etc/sudoers.d/claude-user
 
-# Add shared directory mount if configured (idempotent — skip if already present)
+# Add shared directory mount if configured (idempotent -- skip if already present)
 if [[ -n "$fstabLine" ]]; then
     mkdir -p "$mountDir"
     if ! grep -qF "$mountDir" /etc/fstab 2>/dev/null; then
         echo "$fstabLine" >> /etc/fstab
     fi
 fi
-
-$(if ($sudoMode -eq "full") { @"
-# Lock down critical config files (immutable even to root)
-chattr +i /etc/wsl.conf
-chattr +i /etc/sudoers.d/claude-user
-chattr +i /etc/fstab
-"@ } else { "# Controlled mode — no immutable flags needed" })
+$chattrBlock
 
 # Lock the Windows user account inside this distro
 passwd -l $WinUser 2>/dev/null || true
