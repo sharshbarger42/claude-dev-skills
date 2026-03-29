@@ -1,3 +1,9 @@
+---
+name: verify-pr
+description: Verify PR implements issue requirements — catch missing features, inaccurate descriptions, pattern violations
+args: "<repo#N>"
+---
+
 # Verify PR
 
 Verify that a PR's code actually does what the linked issue requires and what the PR description claims. Catches implementation drift, scope creep, missing requirements, inaccurate descriptions, pattern violations, and incomplete work.
@@ -15,29 +21,7 @@ Unlike `/review-pr` (which judges code quality), this skill checks **truthfulnes
 
 ### Repo resolution
 
-# Repo Resolution Logic
-
-Use this shared logic to parse issue/PR/repo references in dev-workflow skills.
-
-## Load the shorthand table
-
-!`cat $HOME/.claude/development-skills/config/repos.md`
-
-## Parsing rules
-
-**Input formats:**
-- Full URL: `https://git.home.superwerewolves.ninja/super-werewolves/food-automation/issues/18`
-- Owner/repo#N: `super-werewolves/food-automation#18`
-- Shorthand#N: `food-automation#18`
-- Repo only (no issue/PR): `food-automation` or `super-werewolves/food-automation`
-
-**How to parse:**
-- **Full URL**: extract owner/repo from the path segments, index from the last numeric segment
-- **`owner/repo#N`**: split on `/` and `#`
-- **`repo#N`** or **`repo`**: look up repo in the shorthand table above, extract index after `#` if present
-- **Local path**: use the `Local path` column from the shorthand table for the resolved repo
-
-If the repo doesn't match any known shorthand and no owner is given, stop and ask the user for the full `owner/repo`.
+!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
 
 ### 1a. Fetch PR metadata
 
@@ -52,16 +36,18 @@ Use `mcp__gitea__pull_request_read` with `method: "get"` to get:
 ```bash
 cd {repo_local_path}
 git fetch origin
+git rev-parse origin/{base_branch} >/dev/null 2>&1 || echo "FETCH FAILED — remote unreachable"
 ```
 
-This ensures we can read both the base branch and the PR branch locally.
+Verify the fetch succeeded before proceeding. If the fetch fails, warn the user that verification will use potentially stale data. This ensures we can read both the base branch and the PR branch locally.
 
 ### 1c. Fetch the linked issue
 
-Parse the PR body and branch name for issue references:
-- Branch name patterns: `feature/{N}-*`, `fix/{N}-*`, `feat/{N}-*`
-- PR body patterns: `fixes #N`, `closes #N`, `resolves #N`, `Part of #N`, `Sub-issue of #N`
-- PR title patterns: `feat(#{N})`, `fix(#{N})`
+Parse the PR body, title, and branch name for issue references. Check all sources — any match is valid:
+
+- **Branch name patterns:** `feature/{N}-*`, `fix/{N}-*`, `feat/{N}-*` — extract the numeric portion after the prefix. If the branch doesn't contain a number (e.g., `feature/add-caching`), skip this source gracefully.
+- **PR body patterns:** `fixes #N`, `closes #N`, `resolves #N`, `Part of #N`, `Sub-issue of #N`
+- **PR title patterns:** `feat(#{N})`, `fix(#{N})`
 
 If an issue is found, fetch it via `mcp__gitea__issue_read`. Extract:
 - Issue title and body (the requirements)
@@ -71,7 +57,7 @@ If an issue is found, fetch it via `mcp__gitea__issue_read`. Extract:
 
 If the issue has a parent (`Sub-issue of #N`), fetch the parent too for broader context.
 
-If no linked issue is found, note this as a finding — PRs without linked issues have no verifiable requirements. Continue with PR description verification only (Steps 3-6).
+If no linked issue is found, note this as a finding — PRs without linked issues have no verifiable requirements. Skip Steps 2 and 5a, and continue with PR description verification only (Steps 3-6). In the report, omit the Requirements Coverage section and show "No linked issue — requirements coverage not applicable" instead.
 
 ### 1d. Fetch the diff
 

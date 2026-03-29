@@ -1,16 +1,22 @@
+---
+name: hallucination-check
+description: Verify plan claims against reality — catch false libs, wrong APIs, vague steps
+args: "<path|slug|issue-ref>"
+---
+
 # Hallucination Check
 
 Verify a plan's concrete claims against reality and flag vague or unexecutable sections. Catches AI-generated hallucinations (non-existent libraries, wrong APIs, fabricated file paths) and human hand-waving (vague steps, missing details, unstated assumptions).
 
-**Input:** Path to a plan markdown file, or a plan directory slug.
+**Input:** Path to a plan markdown file, a plan directory slug, or a Gitea issue reference. **Required** — no default.
 
 **Accepted formats:**
 - Absolute path: `/home/claude-user/plans/2026-03-28-gpu-workstation/plan.md`
-- Plan slug: `gpu-workstation` (resolves to `~/plans/*-gpu-workstation/plan.md`)
-- Relative path: `plan.md` (uses current directory)
+- Plan slug: `gpu-workstation` (resolves to most recent `~/plans/*-gpu-workstation/plan.md`)
+- Relative path: `./plan.md` (resolved from `pwd`)
 - Gitea issue URL or reference: `homelab-setup#776` (reads the issue body as the plan)
 
-If no argument is provided, look for `plan.md` in the current directory.
+If no argument is provided, ask the user for a plan path or issue reference.
 
 ## Step 1: Load the plan
 
@@ -18,7 +24,7 @@ If no argument is provided, look for `plan.md` in the current directory.
 
 1. Resolve the path:
    - If argument is an absolute path, use it directly
-   - If argument looks like a slug (no `/` or `.`), search `~/plans/*-{slug}/plan.md`
+   - If argument looks like a slug (no `/` or `.`), search `~/plans/*-{slug}/plan.md`. If multiple directories match, pick the one with the latest date prefix. If still ambiguous, list matches and ask the user.
    - If argument is a relative path, resolve from `pwd`
 2. Read the plan file
 3. If an `analysis.md` exists in the same directory, read it too — it provides additional context
@@ -27,29 +33,7 @@ If no argument is provided, look for `plan.md` in the current directory.
 
 1. Parse using repo resolution logic:
 
-# Repo Resolution Logic
-
-Use this shared logic to parse issue/PR/repo references in dev-workflow skills.
-
-## Load the shorthand table
-
-!`cat $HOME/.claude/development-skills/config/repos.md`
-
-## Parsing rules
-
-**Input formats:**
-- Full URL: `https://git.home.superwerewolves.ninja/super-werewolves/food-automation/issues/18`
-- Owner/repo#N: `super-werewolves/food-automation#18`
-- Shorthand#N: `food-automation#18`
-- Repo only (no issue/PR): `food-automation` or `super-werewolves/food-automation`
-
-**How to parse:**
-- **Full URL**: extract owner/repo from the path segments, index from the last numeric segment
-- **`owner/repo#N`**: split on `/` and `#`
-- **`repo#N`** or **`repo`**: look up repo in the shorthand table above, extract index after `#` if present
-- **Local path**: use the `Local path` column from the shorthand table for the resolved repo
-
-If the repo doesn't match any known shorthand and no owner is given, stop and ask the user for the full `owner/repo`.
+!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
 
 2. Fetch the issue body via `mcp__gitea__issue_read`
 3. Also fetch comments — they may contain additional plan details or sub-issue breakdowns
@@ -63,30 +47,32 @@ If no repo is identifiable, ask the user which repo the plan targets (or if it's
 
 ## Step 1b: Ensure repos are on latest main
 
-Before verifying any code claims, pull the latest from the default branch for every repo that will be checked:
+Before verifying any code claims, fetch the latest from the default branch for every repo that will be checked. **Do not disturb the user's working tree** — use a temporary worktree or detached read.
 
 ```bash
 cd {repo_local_path}
 git fetch origin
-git checkout {default_branch}
-git pull origin {default_branch}
 ```
 
-If the repo has uncommitted changes (dirty tree), stash them first:
+For all code verification in Steps 3-4, read files from `origin/{default_branch}` using `git show` rather than checking out:
 
 ```bash
-git stash
-git pull origin {default_branch}
-# Do NOT pop the stash — leave the tree clean for verification
+# Read a file from latest main without switching branches
+git show origin/{default_branch}:{file_path}
+
+# Check if a file exists on latest main
+git ls-tree --name-only origin/{default_branch} {file_path}
 ```
 
-**This is critical.** Verifying against stale code defeats the purpose of the skill. Always confirm the HEAD SHA matches `origin/{default_branch}` before proceeding.
+This avoids switching branches, stashing, or otherwise modifying the user's working state. The user's current branch and uncommitted work are left untouched.
 
-If the repo isn't cloned locally, clone it:
+**Verify the fetch succeeded** — confirm `origin/{default_branch}` is reachable:
 
 ```bash
-git clone {ssh_url} {repo_local_path}
+git rev-parse origin/{default_branch} >/dev/null 2>&1 || echo "FETCH FAILED"
 ```
+
+If the repo isn't cloned locally, use `mcp__gitea__get_file_contents` and `mcp__gitea__get_dir_contents` via the Gitea MCP server instead of cloning. Only clone as a last resort, and look up the SSH URL from the Gitea API (`mcp__gitea__get_repo`).
 
 ## Step 2: Extract verifiable claims
 
