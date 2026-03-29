@@ -74,7 +74,7 @@ development-skills/
 | `/clear-session` | Clear active session file when done with current work |
 | `/setup-env [section] [repo]` | Interactive environment setup — Gitea, deploy config, plugins, tools |
 
-### Planning
+### Planning & Verification
 
 | Skill | Description |
 |-------|-------------|
@@ -82,6 +82,8 @@ development-skills/
 | `/analyze-idea [idea]` | Critical analysis of a problem/solution idea |
 | `/plan-project [plan-dir]` | Research and create detailed project plan |
 | `/create-issues plan-dir [repo]` | Turn a plan into Gitea milestones and issues |
+| `/hallucination-check path` | Verify plan claims against reality — catch false libs, wrong APIs, vague steps |
+| `/verify-pr repo#N` | Verify PR implements issue requirements — catch missing features, inaccurate descriptions, pattern violations |
 
 **Planning flow:** `/analyze-idea` → `/plan-project` → `/create-issues` (or `/plan-the-thing` for all three)
 
