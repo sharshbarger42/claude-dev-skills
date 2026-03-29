@@ -168,11 +168,13 @@ For each tier, run sub-tasks **as concurrently as possible** using the Agent too
      - **PR body:** Include `Part of #{parent_index}` instead of `Closes #{parent_index}`
      - **PR body:** Include `Closes #{subtask_index}` to auto-close the sub-task on merge
      - **Skip Step 11** (doc updates) — docs will be updated once at the end
+     - **Steps 9-10 are MANDATORY** — after creating the PR, the sub-task agent MUST invoke `/review-pr {repo}#{pr_number}` and triage the review comments (fix "fix now" items, create issues for "separate issue" items). Do NOT skip the review. Include this instruction verbatim in the agent prompt.
 
 2. Wait for all agents in the tier to complete before starting the next tier.
 
 3. After each tier completes:
    - Check which sub-tasks succeeded and which failed
+   - **Verify reviews were posted:** For each successful sub-task PR, check that a code review comment exists on the PR (look for "## Code Review" in PR comments). If a sub-task agent skipped the review, run `/review-pr {repo}#{pr_number}` yourself before merging.
    - For failed sub-tasks, record the error and continue with the next tier (don't block the whole run)
    - Merge successful PRs into the integration branch via `mcp__gitea__pull_request_write` with `merge_style: "merge"` and `delete_branch: true`
 
