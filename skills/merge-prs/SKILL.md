@@ -119,9 +119,11 @@ If the failure is fixable:
    ```
 3. Run the failing tool locally to reproduce and identify specific errors (e.g., `ansible-lint`, `yamllint`, `kubeconform`)
 4. Fix each error — edit the files, staying within the scope of what's needed to pass CI
-5. Commit and push using the shared commit procedure:
+5. Commit and push the fix:
 
 !`cat $HOME/.claude/development-skills/lib/commit-push.md`
+
+   **CI fix override:** If the CI failure was caused by PR code (not base-branch drift), amend the fix into the relevant commit instead of creating a new one: `git add <fixed_files> && git commit --amend --no-edit && git push --force-with-lease origin {head_branch}`. If the failure is from base-branch drift (e.g., a new lint rule on main), a separate fix commit is acceptable.
 6. Wait for CI to re-run (poll every 30s for up to 5 minutes)
 7. If CI passes, mark the PR as `ready`
 8. If CI still fails after the fix attempt, mark as `not mergeable (CI failed after fix attempt: {details})`

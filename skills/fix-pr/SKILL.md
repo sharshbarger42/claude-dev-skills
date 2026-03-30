@@ -85,11 +85,28 @@ If `mergeable` is `true`, skip this step entirely.
 
 ## Step 3: Fetch all comments
 
-Gather every comment on the PR from three sources:
+### 3a: Check for new comments since last push
+
+Compare the PR's current HEAD SHA (`head.sha` from Step 2) against each review's `submitted_at` timestamp and `stale` field. A review is **stale** if the PR branch has been updated (force-pushed or new commits) since the review was submitted.
+
+If **all** reviews are stale and there are no non-stale top-level user comments posted after the PR's latest commit, then all feedback has already been addressed. Report this to the user:
+
+```
+All reviews on PR #N are stale (submitted before the current HEAD {sha}).
+No new comments found since the last push. Nothing to fix.
+```
+
+Then ask the user whether to proceed anyway or stop. Do NOT silently skip — always inform the user and let them decide.
+
+### 3b: Gather comments
+
+Gather every comment on the PR from these sources:
 
 1. **Review comments (inline):** Use `mcp__gitea__list_pull_request_reviews` to get all reviews. For each review, use `mcp__gitea__list_pull_request_review_comments` to get the inline comments (these have `path`, `position`, and `body`).
 
 2. **Top-level PR comments:** Use `mcp__gitea__get_issue_comments_by_index` to get non-review comments on the PR thread.
+
+When processing reviews, record the `stale` field from each review. Stale reviews should still be included in the comment list but flagged — the user may want to re-address them or may have already handled them.
 
 Collect all comments into a single list with these fields per comment:
 - `id` (comment ID — needed for resolving later)
@@ -200,6 +217,15 @@ Run the quality gate procedure on all files you changed in Step 8. Do NOT skip t
 Include any files that the quality gate auto-formatted when staging.
 
 !`cat $HOME/.claude/development-skills/lib/commit-push.md`
+
+**Squashing review fixes into original commits:** Review fixes should not create new "address review" commits. Follow the Clean History Rules from `commit-push.md` above, with these fix-pr-specific additions:
+
+1. **Quality gate first.** Run Step 9a before creating any fixup commits. If the quality gate auto-formats files, include those reformatted files in the same fixup commit as the code change they relate to (not a separate fixup).
+2. **Find the target commit.** Use `git log --oneline {base_branch}..HEAD` to identify which original commit introduced the code being changed.
+3. **Create fixup commits.** For each fix, stage the changed files (including any quality-gate reformats for the same code) and use `git commit --fixup {original_sha}`.
+4. **Squash and force-push.** See the squash procedure in Clean History Rules above.
+
+If the branch has only one commit, simply amend it: `git add <file1> <file2> ... && git commit --amend --no-edit && git push --force-with-lease`.
 
 ## Step 10: Resolve addressed comments
 

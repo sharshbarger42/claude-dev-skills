@@ -411,6 +411,8 @@ Include any files that the quality gate auto-formatted when staging.
 
 !`cat $HOME/.claude/development-skills/lib/commit-push.md`
 
+**Iterative fix-ups during implementation:** If the quality gate finds issues caused by your code in Step 6, fix them and fold the fix into the original commit using the Clean History Rules above. The branch should have one clean commit per logical change when you push.
+
 The worktree will be automatically cleaned up when the session ends (you'll be prompted to keep or remove it).
 
 ## Step 8: Create PR

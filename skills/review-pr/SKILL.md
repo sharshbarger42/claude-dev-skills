@@ -30,6 +30,21 @@ Use `mcp__gitea__get_pull_request_by_index` with the parsed `owner`, `repo`, and
 
 If the PR is not found, report the error and stop.
 
+## Step 2b: Check for existing reviews on current HEAD
+
+Before fetching the diff and running a new review, check if the PR already has a non-stale review covering the current HEAD:
+
+1. Use `mcp__gitea__list_pull_request_reviews` to get all reviews.
+2. Check each review's `stale` field. A review is **not stale** if the PR branch has not changed since it was submitted.
+3. If a non-stale review from `code-review-agent` exists, the current code has already been reviewed. Report this to the user:
+
+```
+PR #N already has a review from code-review-agent covering the current HEAD ({sha}).
+The existing review is not stale — no new commits since it was posted.
+```
+
+Then ask the user whether to run a fresh review anyway or stop. Do NOT silently skip — always inform the user and let them decide.
+
 ## Step 3: Fetch PR diff
 
 Use `mcp__gitea__get_pull_request_diff` with the same `owner`, `repo`, and `index`.
