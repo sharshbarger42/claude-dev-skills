@@ -349,9 +349,7 @@ Ask the user whether to:
 
 ## Step 3: Read repo AGENTS.md
 
-Use `mcp__gitea__get_file_contents` to fetch `AGENTS.md` from the repo's default branch. Get the default branch name from the issue metadata (`repository.default_branch`) — do NOT hardcode `master` or `main`.
-
-If AGENTS.md doesn't exist, note that no repo-specific coding standards were found and proceed without it.
+!`cat $HOME/.claude/development-skills/lib/fetch-agents-md.md`
 
 ## Step 4: Confirm approach with user
 
@@ -409,10 +407,9 @@ Run the quality gate procedure on all files you changed in Step 6. Do NOT skip t
 
 ### 7b: Commit and push
 
-1. Stage changed files individually (use `git add <file1> <file2> ...`, NOT `git add -A` or `git add .`) — include any files that the quality gate auto-formatted
-2. Commit using the repo's commit format from AGENTS.md. Typical format: `feat(#{index}): short description` (or `fix(#{index}): short description` for bug issues)
-   - **IMPORTANT:** Per AGENTS.md Rule 3 — NO Claude/AI/co-authored-by references in commit messages
-3. Push the branch: `git push -u origin {branch_prefix}/{index}-{short-slug}`
+Include any files that the quality gate auto-formatted when staging.
+
+!`cat $HOME/.claude/development-skills/lib/commit-push.md`
 
 The worktree will be automatically cleaned up when the session ends (you'll be prompted to keep or remove it).
 

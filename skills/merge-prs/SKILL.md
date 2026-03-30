@@ -119,9 +119,9 @@ If the failure is fixable:
    ```
 3. Run the failing tool locally to reproduce and identify specific errors (e.g., `ansible-lint`, `yamllint`, `kubeconform`)
 4. Fix each error — edit the files, staying within the scope of what's needed to pass CI
-5. Commit with message: `fix(#{pr_index}): resolve CI {tool} failures`
-   - **IMPORTANT:** Per AGENTS.md — NO Claude/AI/co-authored-by references in commit messages
-6. Push to the PR branch: `git push origin {head_branch}`
+5. Commit and push using the shared commit procedure:
+
+!`cat $HOME/.claude/development-skills/lib/commit-push.md`
 7. Wait for CI to re-run (poll every 30s for up to 5 minutes)
 8. If CI passes, mark the PR as `ready`
 9. If CI still fails after the fix attempt, mark as `not mergeable (CI failed after fix attempt: {details})`
@@ -301,12 +301,14 @@ Dynamically discover whether the repo defines a post-merge health check — do N
 
 For each merged repo:
 
-1. Fetch the repo's `AGENTS.md` from the default branch using `mcp__gitea__get_file_contents(owner, repo, ref=default_branch, filePath="AGENTS.md")`
-2. Look for a `## Post-Merge Checklist` section in the file content
-3. If the section exists, parse it for:
+!`cat $HOME/.claude/development-skills/lib/fetch-agents-md.md`
+
+Then extract health check configuration:
+1. Look for a `## Post-Merge Checklist` section in the file content
+2. If the section exists, parse it for:
    - **Health check command** — a fenced code block after "Health check command:" (e.g. `scripts/check-managed.sh` or `curl -s http://example.com/health`)
    - **How to evaluate** — instructions below the command explaining how to interpret the output (exit codes, JSON parsing, expected response fields)
-4. If the section does **not** exist, or `AGENTS.md` is missing, skip the health check — report deploy status only
+3. If the section does **not** exist, or `AGENTS.md` is missing, skip the health check — report deploy status only
 
 #### Running the health check
 
@@ -331,9 +333,8 @@ Body: PR #{pr_index} ({pr_title}) was merged and the deploy workflow completed s
 ```
 
 Create with `mcp__gitea__create_issue`, then label it:
-1. Call `mcp__gitea__list_repo_labels` to find label IDs for `bug` and `priority: high`
-2. Call `mcp__gitea__add_issue_labels` with the new issue index and both label IDs
-3. If any label doesn't exist in the repo, skip it silently
+
+!`cat $HOME/.claude/development-skills/lib/label-issue.md`
 
 ### If deploy failed
 

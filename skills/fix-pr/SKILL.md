@@ -147,9 +147,7 @@ For each comment, extract:
 
 ## Step 5: Read repo AGENTS.md
 
-Use `mcp__gitea__get_file_contents` to fetch `AGENTS.md` from the repo's default branch (from Step 2 metadata — do NOT hardcode `master` or `main`).
-
-If AGENTS.md doesn't exist, note that no repo-specific coding standards were found and proceed without it.
+!`cat $HOME/.claude/development-skills/lib/fetch-agents-md.md`
 
 ## Step 6: Present summary and confirm
 
@@ -185,15 +183,7 @@ Read the relevant files and process comments by disposition:
 4. **disposition: `questionable-benefit`** — Create a Gitea issue using `mcp__gitea__create_issue` with title `"[review][decision-needed] {brief description}"` and body explaining the trade-off and referencing the PR. Label with type `enhancement` and priority `low`. These issues are for human triage, not auto-pickup.
 5. **Explicit issue requests** — comments that say "create a ticket for X" or similar: use `mcp__gitea__create_issue`. Label with type and priority.
 
-### Labeling created issues
-
-When creating an issue, apply both a **type** label and a **priority** label:
-
-1. Call `mcp__gitea__list_repo_labels` to find label IDs for the repo
-2. **Type label** — pick one: `bug` (broken behavior, security vulnerability, correctness problem), `enhancement` (improvement to existing functionality), or `feature` (new capability)
-3. **Priority label** — pick one based on severity/impact: `priority: high` (blocks users or other work), `priority: medium` (normal queue), or `priority: low` (nice to have)
-4. Call `mcp__gitea__add_issue_labels` with the new issue index and both label IDs
-5. If any label doesn't exist in the repo, skip it silently
+!`cat $HOME/.claude/development-skills/lib/label-issue.md`
 
 Follow the repo's AGENTS.md coding standards when making changes.
 
@@ -207,10 +197,9 @@ Run the quality gate procedure on all files you changed in Step 8. Do NOT skip t
 
 ### 9b: Commit and push
 
-1. Stage changed files individually (`git add <file1> <file2> ...` — NOT `git add -A` or `git add .`) — include any files that the quality gate auto-formatted
-2. Commit with message format: `fix(#{pr_index}): address PR review — {brief summary}`
-   - **IMPORTANT:** Per AGENTS.md Rule 3 — NO Claude/AI/co-authored-by references in commit messages
-3. Push to the head branch: `git push origin {head_branch}`
+Include any files that the quality gate auto-formatted when staging.
+
+!`cat $HOME/.claude/development-skills/lib/commit-push.md`
 
 ## Step 10: Resolve addressed comments
 
