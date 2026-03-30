@@ -122,9 +122,9 @@ If the failure is fixable:
 5. Commit and push using the shared commit procedure:
 
 !`cat $HOME/.claude/development-skills/lib/commit-push.md`
-7. Wait for CI to re-run (poll every 30s for up to 5 minutes)
-8. If CI passes, mark the PR as `ready`
-9. If CI still fails after the fix attempt, mark as `not mergeable (CI failed after fix attempt: {details})`
+6. Wait for CI to re-run (poll every 30s for up to 5 minutes)
+7. If CI passes, mark the PR as `ready`
+8. If CI still fails after the fix attempt, mark as `not mergeable (CI failed after fix attempt: {details})`
 
 ### Limits
 

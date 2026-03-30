@@ -44,6 +44,7 @@ Then extract review-specific standards:
 1. Look for the `## Code Review Standards` heading in the file content.
 2. Extract from that heading to the next `## ` heading or end of file.
 3. If the `## Code Review Standards` section is not found, fall back to the full AGENTS.md content.
+4. If no AGENTS.md exists at all, set `{review_standards}` to: `"No repository-specific coding standards found."`
 
 Store the extracted text as `{review_standards}`.
 

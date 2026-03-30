@@ -280,9 +280,9 @@ The final criterion must always be: `Human verification: {brief description of w
 
 ### Labeling procedure
 
-!`cat $HOME/.claude/development-skills/lib/label-issue.md`
+Create the issue with `mcp__gitea__create_issue`, then label it:
 
-Create the issue with `mcp__gitea__create_issue`, then apply labels as described above.
+!`cat $HOME/.claude/development-skills/lib/label-issue.md`
 
 ### Cross-referencing
 

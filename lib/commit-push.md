@@ -7,4 +7,4 @@
    - PR review fixes: `fix(#{pr_index}): address PR review — {brief summary}`
    - CI fix: `fix(#{pr_index}): resolve CI {tool} failures`
    - **IMPORTANT:** Per AGENTS.md Rule 3 — NO Claude/AI/co-authored-by references in commit messages
-3. Push the branch: `git push -u origin {branch_name}`
+3. Push the branch: `git push -u origin HEAD` (pushes the current branch to its upstream)
