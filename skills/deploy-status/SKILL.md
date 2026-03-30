@@ -2,7 +2,7 @@
 name: deploy-status
 description: Check deploy pipeline health — CI workflows on main, Flux reconciliation, and deployed app version. Offers to investigate and fix failures.
 args: "[repo]"
-allowed-tools: Read, Bash, Glob, Grep, Agent, AskUserQuestion, WebFetch, mcp__gitea__actions_run_read, mcp__gitea__actions_run_write, mcp__gitea__pull_request_read, mcp__gitea__get_file_contents, mcp__gitea__search_repos
+allowed-tools: Read, Bash, Glob, Grep, Agent, AskUserQuestion, WebFetch, mcp__gitea__actions_run_read, mcp__gitea__actions_run_write, mcp__gitea__pull_request_read, mcp__gitea__get_file_contents, mcp__gitea__search_repos, mcp__gitea__list_commits
 ---
 
 # Deploy Status
@@ -78,18 +78,17 @@ To get the latest commit on the default branch (always fresh from remote):
 git ls-remote origin refs/heads/{default_branch} | cut -f1
 ```
 
-Run this from the repo's local path. **If the result is empty** (branch doesn't exist or remote is unreachable), report "Unable to determine latest commit on {default_branch}" and skip version comparison in Step 5 — do not proceed with an empty SHA.
-
-If the local path doesn't exist, use the Gitea API instead:
+Run this from the repo's local path. **If the result is empty** (branch doesn't exist or remote is unreachable), fall back to the Gitea API:
 
 ```
-mcp__gitea__actions_run_read
-  method: list_runs
+mcp__gitea__list_commits
   owner: {owner}
   repo: {repo}
+  sha: {default_branch}
+  limit: 1
 ```
 
-Filter to runs on the default branch and extract the `head_sha` from the most recent run.
+Extract the `sha` field from the first result. If **both** methods fail or return empty, report "Unable to determine latest commit on {default_branch}" and skip all version comparisons in Step 5 — do not proceed with an empty SHA.
 
 ## Step 4: Check Flux status (deployed services only)
 
@@ -148,8 +147,11 @@ Also get the deployed image tag (filter to running pods to avoid stale data from
 
 ```bash
 kubectl --kubeconfig=$HOME/.kube/qa-readonly-kubeconfig \
-  get pods -n {namespace} --field-selector=status.phase=Running -o jsonpath='{.items[0].spec.containers[0].image}' 2>/dev/null
+  get pods -n {namespace} --field-selector=status.phase=Running \
+  -o jsonpath='{.items[0].spec.containers[0].image}' 2>/dev/null
 ```
+
+If the result is empty (no Running pods), report "No running pods found in {namespace}" instead of proceeding with an empty image tag.
 
 ## Step 5: Verify deployed app version
 
@@ -169,9 +171,12 @@ If the repo has a version endpoint, also check it:
 curl -sf --max-time 10 {prod_base_url}{version_endpoint}
 ```
 
-Extract the `commit` or `BUILD_COMMIT` field from the response. Compare it against the **latest commit SHA on the default branch** (from Step 3d) — this is the authoritative target. If the deployed commit doesn't match, also check the latest successful deploy workflow run SHA to distinguish between "deploy hasn't run yet" vs "deploy ran but Flux hasn't rolled out."
+Extract the `commit` or `BUILD_COMMIT` field from the response. Compare it against the **latest commit SHA on the default branch** (from Step 3d) — this is the **authoritative target**. If they don't match:
 
-If they don't match, flag as **version mismatch** — the deployed version is behind.
+1. Check the latest successful deploy workflow run SHA. If the deploy run SHA matches the latest main commit but the deployed version doesn't, this means "deploy ran but Flux hasn't rolled out yet."
+2. If the deploy run SHA is also behind the latest main commit, this means "deploy hasn't run for the latest commit."
+
+Report the specific scenario so the user can take the right action. The latest main commit is always the source of truth — deploy run SHA is only used to diagnose *why* there's a mismatch.
 
 ### 5b: Check dev version
 
@@ -186,10 +191,10 @@ Extract version info and compare similarly.
 For each smoke endpoint listed in the deploy config, make a quick HTTP request:
 
 ```bash
-curl -sf --max-time 10 -o /dev/null -w "%{http_code}" {base_url}{endpoint}
+curl -sf --max-time 10 -w "\n%{http_code}" {base_url}{endpoint}
 ```
 
-Record the HTTP status code. Flag any non-2xx responses.
+Record the HTTP status code. Flag any non-2xx responses. For endpoints whose path contains `health` or `status`, also parse the response body: if the body contains `"status"` with a value other than `"ok"` or `"healthy"` (e.g., `"degraded"`, `"error"`), flag as unhealthy even if the HTTP status is 200.
 
 ## Step 6: Build status report
 
@@ -266,7 +271,7 @@ Present the findings and ask if the user wants to:
 
 ### If user chooses "Force Flux reconcile"
 
-> **Note:** Despite the name `qa-readonly-kubeconfig`, this kubeconfig has write permissions for Flux annotation operations. The naming is a legacy artifact.
+> **Note:** Despite the name `qa-readonly-kubeconfig`, this kubeconfig has write permissions for Flux annotation operations. The naming is a legacy artifact from when it was originally provisioned as read-only. The annotation write is the only mutation it performs.
 
 ```bash
 kubectl --kubeconfig=$HOME/.kube/qa-readonly-kubeconfig \
@@ -274,7 +279,7 @@ kubectl --kubeconfig=$HOME/.kube/qa-readonly-kubeconfig \
   reconcile.fluxcd.io/requestedAt="$(date -u +%Y-%m-%dT%H:%M:%SZ)" --overwrite
 ```
 
-Wait for Flux to process the reconciliation:
+Wait 60 seconds for Flux to process the reconciliation:
 
 ```bash
 sleep 60
