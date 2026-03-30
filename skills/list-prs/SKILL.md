@@ -1,6 +1,6 @@
 ---
 name: list-prs
-description: List open PRs across repos with workflow status — needs-review, comments-pending, needs-qa, ready-to-merge.
+description: List open PRs across repos with workflow status — needs-review, comments-pending, awaiting-dev-verification, awaiting-prod-verification, ready-to-merge.
 ---
 
 # List PRs Skill
@@ -34,7 +34,7 @@ Collect each PR's: `owner`, `repo`, `index`, `title`, `head.ref` (branch), `head
 
 !`cat $HOME/.claude/development-skills/lib/pr-status-labels.md`
 
-Check each PR's labels for a `pr:` status label (`pr: needs-review`, `pr: comments-pending`, `pr: needs-qa`, `pr: ready-to-merge`).
+Check each PR's labels for a `pr:` status label (`pr: needs-review`, `pr: comments-pending`, `pr: awaiting-dev-verification`, `pr: awaiting-prod-verification`, `pr: ready-to-merge`).
 
 - **If a `pr:` label exists:** use it as the PR's status. These labels are kept in sync by `/do-issue`, `/review-pr`, `/fix-pr`, and `/qa-pr` as PRs move through the pipeline.
 - **If no `pr:` label exists:** fall through to Steps 4-6 to compute the status from review/comment/CI/QA state.
@@ -97,10 +97,15 @@ The PR has no reviews yet, or only has `COMMENT` reviews (no approvals and no ou
 
 **Criteria:** No `APPROVED` or `REQUEST_CHANGES` reviews exist, OR all `REQUEST_CHANGES` reviews are addressed but there are no `APPROVED` reviews.
 
-### `needs-qa`
-The PR is approved and review comments are addressed, but QA hasn't been done (or QA failed and needs re-testing).
+### `awaiting-dev-verification`
+The PR is approved and review comments are addressed, but dev deploy verification hasn't been done (or failed and needs re-testing). Only applies to repos with a dev deploy config.
 
-**Criteria:** At least one `APPROVED` review exists, all `REQUEST_CHANGES` reviews are addressed, and QA status is not `passed`.
+**Criteria:** At least one `APPROVED` review exists, all `REQUEST_CHANGES` reviews are addressed, QA status is not `passed`, and the repo has a dev deploy config.
+
+### `awaiting-prod-verification`
+The PR was merged but prod deploy health checks haven't passed yet. Only applies to repos with a prod deploy config.
+
+**Criteria:** PR is merged, repo has a prod deploy config, and prod verification hasn't completed.
 
 ### `ready-to-merge`
 The PR is approved, comments are addressed, and QA is done (or not required). It's good to go.
@@ -125,10 +130,15 @@ Display results grouped by status. Use a compact table format.
 |------|----|-------|--------|-----|----|
 | food-automation | #39 | refactor: enforce layer boundary | selina | 2d | passed |
 
-### Needs QA
+### Awaiting Dev Verification
 | Repo | PR | Title | Author | Age | Reviews |
 |------|----|-------|--------|-----|---------|
-| homelab-setup | #45 | feat: add monitoring | selina | 5d | 1 approved |
+| multi-agent-coordinator | #45 | feat: add monitoring | selina | 5d | 1 approved |
+
+### Awaiting Prod Verification
+| Repo | PR | Title | Author | Merged | Deploy |
+|------|----|-------|--------|--------|--------|
+| food-automation | #38 | fix: parser edge case | selina | 1h | pending |
 
 ### Needs Review
 | Repo | PR | Title | Author | Age | CI |
@@ -142,9 +152,10 @@ Display results grouped by status. Use a compact table format.
 
 ### Summary
 - **X** ready to merge
-- **Y** needs QA
-- **Z** needs review
-- **W** has pending comments
+- **Y** awaiting dev verification
+- **Z** awaiting prod verification
+- **A** needs review
+- **B** has pending comments
 ```
 
 **Age** is calculated from `created_at` to now, displayed as `Nd` (days) or `Nh` (hours if < 1 day).

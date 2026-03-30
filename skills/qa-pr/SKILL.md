@@ -644,7 +644,7 @@ The deploy workflow failed before smoke tests could run. Check the [workflow run
 After posting the PR comment, update the PR's status label:
 
 - **QA passed, no `[human-assist]` or `[human-verify]` criteria pending** → set `pr: ready-to-merge` (even if `[post-merge]` criteria exist — those are verified after merge by `/merge-prs`)
-- **QA passed, but `[human-assist]` or `[human-verify]` criteria pending** → keep `pr: needs-qa` (human steps remaining)
+- **QA passed, but `[human-assist]` or `[human-verify]` criteria pending** → keep `pr: awaiting-dev-verification` (human steps remaining)
 - **QA failed** → set `pr: comments-pending` (needs fixes before re-test)
 
 Use the PR status label swap procedure from pr-status-labels.md.

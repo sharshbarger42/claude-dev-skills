@@ -184,10 +184,14 @@ Where `/tmp/review-payload.json` contains `{"body": "...", "event": "COMMENT", "
 
 !`cat $HOME/.claude/development-skills/lib/pr-status-labels.md`
 
+!`cat $HOME/.claude/development-skills/lib/deploy-aware-label.md`
+
 After posting the review, update the PR's status label based on the computed verdict:
 
 - **Verdict has any `[critical]` or `[warning]` findings** → set `pr: comments-pending`
-- **Verdict `APPROVE`** (only nits or no findings) → set `pr: needs-qa`
+- **Verdict `APPROVE`** (only nits or no findings) → check deploy config:
+  - Repo has dev deploy config → set `pr: awaiting-dev-verification`
+  - Repo has no dev deploy config → set `pr: ready-to-merge`
 
 Use the PR status label swap procedure from pr-status-labels.md.
 

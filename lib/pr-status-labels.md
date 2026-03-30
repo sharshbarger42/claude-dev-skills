@@ -6,8 +6,11 @@ All repos use these `pr:` labels to track pull request workflow state in the Git
 |-------|---------|------------|
 | `pr: needs-review` | PR is open and waiting for code review | `/do-issue` (on PR creation) |
 | `pr: comments-pending` | Review posted with findings that need to be addressed | `/review-pr` (when verdict has criticals/warnings) |
-| `pr: needs-qa` | Review comments addressed, awaiting QA verification | `/fix-pr` (after pushing fixes), `/review-pr` (when verdict is approve) |
-| `pr: ready-to-merge` | Approved, QA passed, good to go | `/qa-pr` (when QA passes) |
+| `pr: awaiting-dev-verification` | Approved, awaiting dev deploy + smoke tests (only for repos with dev deploy config) | `/fix-pr`, `/review-pr` (when approved, repo has dev deploy) |
+| `pr: ready-to-merge` | Approved, verified (or no dev deploy), good to go | `/qa-pr` (when QA passes), `/review-pr` or `/fix-pr` (when approved, repo has no dev deploy) |
+| `pr: awaiting-prod-verification` | Merged, awaiting prod deploy health checks | `/merge-prs` (after merge, repo has prod deploy) |
+
+**Note:** For repos without a dev deploy config, skip `pr: awaiting-dev-verification` and set `pr: ready-to-merge` directly. See `deploy-aware-label.md` for the config-checking logic.
 
 ### Swapping PR status labels
 

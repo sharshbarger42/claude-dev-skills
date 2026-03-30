@@ -399,9 +399,17 @@ This is the main work phase. Use your judgment to implement the issue based on:
 
 Read relevant files, write code, edit files. Do the actual implementation work here.
 
-## Step 7: Commit and push
+## Step 7: Quality gate, commit, and push
 
-1. Stage changed files individually (use `git add <file1> <file2> ...`, NOT `git add -A` or `git add .`)
+### 7a: Run the quality gate
+
+!`cat $HOME/.claude/development-skills/lib/quality-gate.md`
+
+Run the quality gate procedure on all files you changed in Step 6. Do NOT skip this step.
+
+### 7b: Commit and push
+
+1. Stage changed files individually (use `git add <file1> <file2> ...`, NOT `git add -A` or `git add .`) — include any files that the quality gate auto-formatted
 2. Commit using the repo's commit format from AGENTS.md. Typical format: `feat(#{index}): short description` (or `fix(#{index}): short description` for bug issues)
    - **IMPORTANT:** Per AGENTS.md Rule 3 — NO Claude/AI/co-authored-by references in commit messages
 3. Push the branch: `git push -u origin {branch_prefix}/{index}-{short-slug}`
@@ -430,7 +438,13 @@ After creating the PR:
 
 !`cat $HOME/.claude/development-skills/lib/pr-status-labels.md`
 
-**Fix mode note:** If `FIX_MODE = true`, the PR already exists — skip PR creation entirely. Instead, swap `status: in-progress` to `status: ready-to-test` on the issue, and set `pr: needs-qa` on the PR. Then jump to Step 12.
+**Fix mode note:** If `FIX_MODE = true`, the PR already exists — skip PR creation entirely. Instead, swap `status: in-progress` to `status: ready-to-test` on the issue, and set the PR label based on deploy config:
+- Repo has dev deploy config → set `pr: awaiting-dev-verification`
+- Repo has no dev deploy config → set `pr: ready-to-merge`
+
+!`cat $HOME/.claude/development-skills/lib/deploy-aware-label.md`
+
+Then jump to Step 12.
 
 **Discord notification:** Post a "PR Created" Discord notification using the purple embed template from `discord-notify.md`. Include the PR number, title, branch, and agent name. Best-effort — skip silently if webhook is not configured.
 

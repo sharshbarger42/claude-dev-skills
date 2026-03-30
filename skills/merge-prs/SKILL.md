@@ -232,6 +232,16 @@ If the merge fails, report the error and skip to the next PR.
 
 Record the merge timestamp for each successfully merged PR.
 
+### Apply post-merge label
+
+!`cat $HOME/.claude/development-skills/lib/pr-status-labels.md`
+
+!`cat $HOME/.claude/development-skills/lib/deploy-aware-label.md`
+
+After each successful merge, check the deploy config for the repo:
+- Repo **has** prod deploy config → set `pr: awaiting-prod-verification` on the PR
+- Repo has **no** prod deploy config → remove any remaining `pr:` label (PR is done)
+
 **Discord notification:** After each successful merge, post a "PR Merged" Discord notification using the green embed template:
 
 !`cat $HOME/.claude/development-skills/lib/discord-notify.md`
@@ -392,6 +402,10 @@ PR #{pr_index} was merged but some post-merge checks failed:
 ```
 
 Create a bug issue for any failed post-merge criteria (same pattern as health check failures in Step 9).
+
+### Remove prod verification label
+
+If all post-merge criteria passed AND health checks passed (Step 9), remove `pr: awaiting-prod-verification` from the PR. If any checks failed, leave the label in place — the bug issue serves as the follow-up.
 
 ### Update issue checklist
 

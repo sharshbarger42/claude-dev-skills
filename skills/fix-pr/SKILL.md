@@ -197,9 +197,17 @@ When creating an issue, apply both a **type** label and a **priority** label:
 
 Follow the repo's AGENTS.md coding standards when making changes.
 
-## Step 9: Commit and push
+## Step 9: Quality gate, commit, and push
 
-1. Stage changed files individually (`git add <file1> <file2> ...` — NOT `git add -A` or `git add .`)
+### 9a: Run the quality gate
+
+!`cat $HOME/.claude/development-skills/lib/quality-gate.md`
+
+Run the quality gate procedure on all files you changed in Step 8. Do NOT skip this step.
+
+### 9b: Commit and push
+
+1. Stage changed files individually (`git add <file1> <file2> ...` — NOT `git add -A` or `git add .`) — include any files that the quality gate auto-formatted
 2. Commit with message format: `fix(#{pr_index}): address PR review — {brief summary}`
    - **IMPORTANT:** Per AGENTS.md Rule 3 — NO Claude/AI/co-authored-by references in commit messages
 3. Push to the head branch: `git push origin {head_branch}`
@@ -226,9 +234,13 @@ After pushing, mark addressed comments as resolved on the PR:
 
 !`cat $HOME/.claude/development-skills/lib/pr-status-labels.md`
 
+!`cat $HOME/.claude/development-skills/lib/deploy-aware-label.md`
+
 After resolving comments, update the PR's status label:
 
-- **All `REQUEST_CHANGES` reviews dismissed** (every review comment was addressed) → set `pr: needs-qa`
+- **All `REQUEST_CHANGES` reviews dismissed** (every review comment was addressed) → check deploy config:
+  - Repo has dev deploy config → set `pr: awaiting-dev-verification`
+  - Repo has no dev deploy config → set `pr: ready-to-merge`
 - **Some `REQUEST_CHANGES` reviews remain** (comments were skipped or deferred) → set `pr: comments-pending`
 
 Use the PR status label swap procedure from pr-status-labels.md.
