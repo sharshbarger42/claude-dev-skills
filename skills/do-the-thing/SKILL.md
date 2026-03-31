@@ -13,16 +13,37 @@ Full development loop in one command: triage open issues, pick one, implement it
 
 If no argument is provided, infer the repo from context (see Step 1).
 
+## Inter-skill Variables
+
+These variables flow between skill invocations. Extract them explicitly after each step — do NOT rely on reading your own prior output, as context compaction may erase it. All variables are also persisted in the session file (see Session persistence below) so they survive compaction.
+
+| Variable | Set by | Used by | Description |
+|----------|--------|---------|-------------|
+| `{owner}` | Step 1 | All steps | Repo owner (e.g., `super-werewolves`) |
+| `{repo}` | Step 1 | All steps | Repo name as used in Gitea API calls (e.g., `food-automation`) |
+| `{repo_shorthand}` | Step 1 | Steps 2-7 | Shorthand used in skill args — may be the same as `{repo}` or a configured alias from `config/repos.md` |
+| `{repo_local_path}` | Step 1 | Session file, workspace | Local checkout path from the shorthand table (e.g., `~/gitea-repos/food-automation`) |
+| `{issue_index}` | Step 3 | Steps 4-7 | Selected issue number |
+| `{issue_title}` | Step 3 | Step 7 | Selected issue title |
+| `{branch_name}` | Step 4 | Steps 5-7 | Feature branch created by do-issue |
+| `{pr_index}` | Step 4 | Steps 5-7 | PR number created by do-issue |
+| `{review_has_fixes}` | Step 4 | Step 5 | Whether review triage found "fix now" items (`true`/`false`). **Default: `true`** — if unset or extraction failed, run fix-pr defensively. |
+| `{fix_commit_sha}` | Step 5 | Step 7 | Last commit SHA from fix-pr (if run; if fix-pr made multiple commits, use the final one) |
+| `{merge_style}` | Step 6 | Step 7 | How the PR was merged (squash/rebase/merge) |
+| `{deploy_status}` | Step 6 | Step 7 | Deploy result (passed/failed/no deploy) |
+
+**On context compaction:** If you lose context, re-read the session file at `{repo_local_path}/SESSION-{AGENT_ID}.md`. All variables above are recorded in the session file's "Context" section after each step. If the session file is missing or unreadable, ask the user which step you were on — they can check the PR and issue state to reconstruct context.
+
 ## Session persistence
 
 !`cat $HOME/.claude/development-skills/lib/session-state.md`
 
-At skill start, call **Session Read** to check for prior context. Then call **Session Write** after these milestones:
-- After Step 1 (repo resolved — record target repo)
-- After Step 3 (issue chosen — record which issue and why)
-- After Step 4 (do-issue complete — record PR number, branch, review results)
-- After Step 5 (fix-pr complete — record what was fixed)
-- After Step 6 (merge complete — record merge result, deploy status)
+At skill start, call **Session Read** to check for prior context. Then call **Session Write** after these milestones, recording the inter-skill variables in the Context section:
+- After Step 1 (repo resolved — record `{owner}`, `{repo}`, `{repo_shorthand}`)
+- After Step 3 (issue chosen — record `{issue_index}`, `{issue_title}`)
+- After Step 4 (do-issue complete — record `{pr_index}`, `{branch_name}`, `{review_has_fixes}`)
+- After Step 5 (fix-pr complete — record `{fix_commit_sha}`)
+- After Step 6 (merge complete — record `{merge_style}`, `{deploy_status}`)
 At the end of Step 7 (report), call **Session Clear**.
 
 **Parent-child note:** This skill invokes `do-issue`, `fix-pr`, and `merge-prs` as child skills. Those child skills also include `session-state.md`. To avoid the child overwriting this parent's session state, child skills should **skip Session Write/Read/Clear when invoked from a parent skill**. The child can detect this by checking if the session file already exists with a different `Skill:` header — if so, leave it alone and let the parent manage the session file.
@@ -118,11 +139,16 @@ This will:
 - Run `/review-pr` automatically
 - Triage the review comments
 
-**Important:** Watch the do-issue output for the PR number. You'll need it for the next step. The PR number will appear in the report at the end (e.g., "PR URL" or "PR #N").
+### Extract outputs and persist
+
+After do-issue completes, extract `{pr_index}`, `{branch_name}`, and `{review_has_fixes}` from its report (see Inter-skill Variables table for descriptions). Then write a **Session Write** recording them — this is the authoritative record that survives compaction.
 
 ## Step 5: Fix PR review comments
 
-After do-issue completes, invoke the fix-pr skill on the PR that was created:
+**Check `{review_has_fixes}`:** If unset (extraction failed or lost to compaction), default to `true` and run fix-pr defensively. If `false` (all comments were "won't fix" or "separate issue"), skip this step and tell the user:
+> All review comments were addressed during implementation. Skipping /fix-pr.
+
+Otherwise, invoke the fix-pr skill using the `{pr_index}` extracted in Step 4:
 
 ```
 Skill: fix-pr
@@ -131,12 +157,13 @@ Args: {repo_shorthand}#{pr_index}
 
 This addresses any remaining review comments that do-issue's triage marked as "fix now".
 
-**Note:** If do-issue's review triage showed zero "fix now" items (all comments were "won't fix" or "separate issue"), skip this step and tell the user:
-> All review comments were addressed during implementation. Skipping /fix-pr.
+### Extract outputs and persist
+
+After fix-pr completes, extract `{fix_commit_sha}` from its report (see Inter-skill Variables table). Then write a **Session Write**.
 
 ## Step 6: Merge
 
-Invoke the merge skill:
+Invoke the merge skill using `{repo_shorthand}`:
 
 ```
 Skill: merge-prs
@@ -150,6 +177,10 @@ This will:
 - Merge the PR
 - Monitor deployment (if applicable)
 - Run health checks (if applicable)
+
+### Extract outputs and persist
+
+After merge-prs completes, extract `{merge_style}` and `{deploy_status}` from its report (see Inter-skill Variables table). Then write a **Session Write**.
 
 ## Step 7: Report
 
