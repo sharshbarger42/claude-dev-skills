@@ -42,15 +42,23 @@ Then inside Claude Code:
 development-skills/
 ├── config/              # Committed defaults (infrastructure template)
 ├── lib/                 # Shared libs included by skills via !cat
-├── skills/              # Workflow skills (see table below)
-├── planning-skills/     # Planning skills (analyze, plan, create issues)
-├── plugins/             # Claude Code plugins (sound-notifications, productivity-hooks)
+├── plugins/
+│   ├── dev-workflow/    # Dev workflow skills (do-issue, review-pr, fix-pr, etc.)
+│   ├── planning/        # Planning skills (analyze-idea, plan-project, create-issues, etc.)
+│   ├── productivity/    # Productivity skills (start, status, setup-env, etc.)
+│   ├── dev-workflow-hooks/
+│   ├── productivity-hooks/
+│   └── sound-notifications/
+├── skills/              # Redirect — skills moved to plugins/
+├── planning-skills/     # Redirect — skills moved to plugins/planning/
 └── setup/               # WSL sandbox provisioning (setup-windows.ps1, setup-linux.sh)
 ```
 
 ## Skills
 
-### Workflow
+Skills live in `plugins/dev-workflow/skills/`, `plugins/planning/skills/`, and `plugins/productivity/skills/`.
+
+### Workflow (`plugins/dev-workflow/skills/`)
 
 | Skill | Description |
 |-------|-------------|
@@ -74,7 +82,7 @@ development-skills/
 | `/clear-session` | Clear active session file when done with current work |
 | `/setup-env [section] [repo]` | Interactive environment setup — Gitea, deploy config, plugins, tools |
 
-### Planning & Verification
+### Planning & Verification (`plugins/planning/skills/`)
 
 | Skill | Description |
 |-------|-------------|
