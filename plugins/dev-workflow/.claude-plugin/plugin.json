@@ -1,0 +1,6 @@
+{
+  "name": "dev-workflow",
+  "version": "1.0.0",
+  "description": "Gitea dev workflow skills — implement issues, review PRs, merge, triage, deploy.",
+  "author": { "name": "super-werewolves" }
+}

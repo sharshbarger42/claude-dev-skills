@@ -18,6 +18,24 @@
       "description": "Injects project context on every prompt, enforces AGENTS.md in subagents, sends Discord notifications on session end.",
       "category": "productivity",
       "source": "./plugins/productivity-hooks"
+    },
+    {
+      "name": "dev-workflow",
+      "description": "Gitea dev workflow skills — implement issues, review PRs, merge, triage, deploy.",
+      "category": "skills",
+      "source": "./plugins/dev-workflow"
+    },
+    {
+      "name": "planning",
+      "description": "Planning pipeline — analyze ideas, create project plans, generate Gitea issues.",
+      "category": "skills",
+      "source": "./plugins/planning"
+    },
+    {
+      "name": "productivity",
+      "description": "Session and workspace management — setup, status, session tracking.",
+      "category": "skills",
+      "source": "./plugins/productivity"
     }
   ]
 }
