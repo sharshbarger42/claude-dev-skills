@@ -17,7 +17,7 @@ If `$ARGUMENTS` is provided, check if it targets a specific section and/or repo:
 - **`/setup-env deploy food-automation`** — jump to deploy-config setup for a single repo only (add or update that repo's row in the table)
 - **`/setup-env repos`** — jump to repos.md setup (Step 2h.1)
 - **`/setup-env infrastructure`** — jump to infrastructure.md setup (Step 2h.2)
-- **`/setup-env plugins`** — jump to plugin installation (Step 4c)
+- **`/setup-env plugins`** — jump to plugin installation (Step 4c/4d)
 - **No arguments** — run the full setup flow starting at Step 0
 
 When running in targeted mode, skip re-run detection (Step 0) and all unrelated steps. Go directly to the targeted section, do the work, and report results.
@@ -452,22 +452,48 @@ Create `~/AGENTS.md` if it doesn't exist. This is the workspace-level guide that
 - Infrastructure: ~/.config/development-skills/config/infrastructure.md
 ```
 
-### 4c. Install Plugins
+### 4c. Migrate Old Symlink Installs
 
-Check if plugins are installed, and show install commands if not:
+Before installing plugins, check for old symlink-based skill installations:
+
+```bash
+ls -la ~/.claude/skills/ 2>/dev/null | grep '\->' | head -5
+```
+
+If symlinks are found in `~/.claude/skills/`, ask the user:
+
+```
+AskUserQuestion:
+  question: "Found old symlink-based skill installations in ~/.claude/skills/. Remove them? (Plugin-installed skills replace these)"
+  options: ["Yes, clean up symlinks", "Keep both (may cause conflicts)"]
+```
+
+If "Yes, clean up symlinks":
+```bash
+rm -f ~/.claude/skills/check-ci ~/.claude/skills/clear-session ~/.claude/skills/deploy-dev ~/.claude/skills/deploy-status ~/.claude/skills/do-issue ~/.claude/skills/do-the-thing ~/.claude/skills/fix-pr ~/.claude/skills/gwt ~/.claude/skills/hallucination-check ~/.claude/skills/investigate-bug ~/.claude/skills/issue-summary ~/.claude/skills/list-prs ~/.claude/skills/merge-prs ~/.claude/skills/qa-pr ~/.claude/skills/review-pr ~/.claude/skills/set-priority ~/.claude/skills/setup-env ~/.claude/skills/start ~/.claude/skills/start-quick ~/.claude/skills/status ~/.claude/skills/test ~/.claude/skills/triage-issues ~/.claude/skills/update-prs ~/.claude/skills/verify-pr ~/.claude/skills/analyze-idea ~/.claude/skills/create-issues ~/.claude/skills/plan-project ~/.claude/skills/plan-the-thing
+```
+
+Report how many symlinks were removed. If no symlinks were found, skip silently.
+
+### 4d. Install Plugins
+
+Check if hook plugins and skill plugins are installed:
 
 ```bash
 claude plugin list 2>/dev/null | grep -q "sound-notifications" || echo "Not installed: sound-notifications"
 claude plugin list 2>/dev/null | grep -q "productivity-hooks" || echo "Not installed: productivity-hooks"
 claude plugin list 2>/dev/null | grep -q "dev-workflow-hooks" || echo "Not installed: dev-workflow-hooks"
+claude plugin list 2>/dev/null | grep -q "dev-workflow@" || echo "Not installed: dev-workflow (skill plugin)"
+claude plugin list 2>/dev/null | grep -q "planning@" || echo "Not installed: planning (skill plugin)"
+claude plugin list 2>/dev/null | grep -q "productivity@" || echo "Not installed: productivity (skill plugin)"
 ```
 
-If not installed, offer to install them using AskUserQuestion:
+If any are not installed, offer to install them using AskUserQuestion:
 
 ```
 AskUserQuestion:
-  question: "Install plugins? (productivity-hooks = guardrails, dev-workflow-hooks = Gitea/project context, sound-notifications = audio alerts)"
-  options: ["Yes, install all", "Skip dev-workflow (productivity + sound only)", "Skip plugins"]
+  question: "Install plugins? (hook plugins = guardrails + Gitea context + sound, skill plugins = dev-workflow + planning + productivity skills)"
+  options: ["Yes, install all", "Skip dev-workflow hooks (productivity + sound + skills only)", "Skip plugins"]
 ```
 
 If yes:
@@ -476,11 +502,20 @@ claude plugin marketplace add ~/gitea-repos/development-skills 2>/dev/null || cl
 claude plugin install sound-notifications@super-werewolves-skills --scope user
 claude plugin install productivity-hooks@super-werewolves-skills --scope user
 claude plugin install dev-workflow-hooks@super-werewolves-skills --scope user
+claude plugin install dev-workflow@super-werewolves-skills --scope user
+claude plugin install planning@super-werewolves-skills --scope user
+claude plugin install productivity@super-werewolves-skills --scope user
+```
+
+After plugin installation, sync shared libs to canonical path:
+
+```bash
+bash ~/gitea-repos/development-skills/scripts/sync-libs.sh
 ```
 
 Report status of each plugin.
 
-### 4d. Install Sound Dependencies (if sound-notifications installed)
+### 4e. Install Sound Dependencies (if sound-notifications installed)
 
 The sound-notifications plugin needs audio utilities to produce sound. The requirements depend on the platform:
 
@@ -534,10 +569,16 @@ Prerequisites:
     infrastructure.md:       {configured/missing}
     deploy-config.md:        {configured/missing}
 
-Plugins:
+Plugins (hooks):
   sound-notifications:       {installed/not installed}
   productivity-hooks:        {installed/not installed}
+  dev-workflow-hooks:        {installed/not installed}
   sound dependencies:        {paplay installed / not needed / missing}
+
+Plugins (skills):
+  dev-workflow:              {installed/not installed}
+  planning:                  {installed/not installed}
+  productivity:              {installed/not installed}
 
 Tools:
   node:                      {version or missing}
