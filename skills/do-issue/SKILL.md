@@ -12,6 +12,17 @@ Implement a Gitea issue end-to-end: read the issue, write the code, create a PR,
 - Owner/repo: `super-werewolves/food-automation#18`
 - Full URL: `https://git.home.superwerewolves.ninja/super-werewolves/food-automation/issues/18`
 
+**Override flags** (used when invoked by epic mode or other parent skills):
+- `--base-branch {branch}` — PR targets this branch instead of the repo's default branch
+- `--parent-index {N}` — parent issue number (used in PR body: `Part of #{N}`). Required when `--base-branch` is set.
+- `--skip-docs` — skip Step 11 (doc updates)
+- `--no-epic` — skip Step 2a (epic detection) to prevent recursive epic mode
+- `--child` — indicates invoked by a parent skill; suppresses QA offer (Step 13) and session persistence
+
+When override flags are present, parse them from the argument string after the issue reference. Example: `food-automation#110 --base-branch feature/99-big-feature --parent-index 99 --skip-docs --no-epic --child`
+
+**Flag validation:** Reject any unrecognized flags with an error — a misspelled `--no-epic` (e.g., `--no-epics`) could cause infinite recursive epic detection. Flag values (for `--base-branch` and `--parent-index`) must not start with `--`; if missing, halt with an error. `--parent-index` must be a positive integer. If `--base-branch` is present but `--parent-index` is absent, halt with an error.
+
 ## Session persistence
 
 !`cat $HOME/.claude/development-skills/lib/session-state.md`
@@ -22,9 +33,9 @@ At skill start, call **Session Read** to check for prior context. Then call **Se
 - After Step 7 (commit and push — record branch name, commit SHA)
 - After Step 8 (PR created — record PR number)
 - After Step 10 (review triage — record what was fixed vs deferred)
-At the end of Step 12 (report), call **Session Clear**.
+At the end of the final step, call **Session Clear**: Step 13 (after the QA offer is answered or skipped) for standalone runs, Step 12 for child invocations. (When `--child` is set, session persistence is suppressed entirely — this is moot.)
 
-**Parent-child note:** If invoked from `/do-the-thing`, the parent manages the session file. Check if the session file already exists with `Skill: do-the-thing` — if so, skip all Session Write/Read/Clear and let the parent handle it.
+**Parent-child note:** If `--child` flag is set, or the session file already exists with a different `Skill:` header (e.g., `do-the-thing`), skip all Session Write/Read/Clear — the parent manages context.
 
 ## Step 1: Parse the issue reference
 
@@ -72,6 +83,10 @@ If the issue is not found, report the error and stop.
 **Determine branch prefix:** Check the issue's labels. If the issue has a `bug` label, set `{branch_prefix}` to `fix`. Otherwise, set `{branch_prefix}` to `feature`. Use this prefix for all branch names throughout the workflow.
 
 ## Step 2a: Detect epic/parent issues
+
+**If `--no-epic` flag is set, skip this step entirely.** This prevents recursive epic detection when a sub-task is itself implemented via `/do-issue`.
+
+**Defense in depth:** Additionally skip this step if you detect you are running inside an Agent subagent (i.e., launched by another skill via the Agent tool). This is a fallback — `--no-epic` is the primary guard. Sub-tasks should never trigger epic mode.
 
 Check whether this issue is a **parent feature issue** with sub-tasks or blockers (an "epic"). Detection criteria — the issue body contains ANY of:
 
@@ -160,21 +175,24 @@ Execution plan:
 
 For each tier, run sub-tasks **as concurrently as possible** using the Agent tool:
 
-1. For each sub-task in the current tier, launch an Agent with:
+1. For each sub-task in the current tier, launch an Agent that invokes `/do-issue` with override flags:
    - `subagent_type: "general-purpose"`
    - `isolation: "worktree"` — each sub-task gets its own worktree
-   - Prompt: implement the sub-task issue using the do-issue workflow (Steps 3-11), but with these overrides:
-     - **PR base branch:** `feature/{parent_index}-{short-slug}` (the integration branch), NOT `main`/`{default_branch}`
-     - **PR body:** Include `Part of #{parent_index}` instead of `Closes #{parent_index}`
-     - **PR body:** Include `Closes #{subtask_index}` to auto-close the sub-task on merge
-     - **Skip Step 11** (doc updates) — docs will be updated once at the end
-     - **Steps 9-10 are MANDATORY** — after creating the PR, the sub-task agent MUST invoke `/review-pr {repo}#{pr_number}` and triage the review comments (fix "fix now" items, create issues for "separate issue" items). Do NOT skip the review. Include this instruction verbatim in the agent prompt.
+   - Prompt: `Run /do-issue {repo_shorthand}#{subtask_index} --base-branch feature/{parent_index}-{short-slug} --parent-index {parent_index} --skip-docs --no-epic --child`
+
+   The override flags ensure:
+   - `--base-branch` → PR targets the integration branch, not main. PR body auto-includes `Part of #{parent_index}` and `Closes #{subtask_index}`.
+   - `--skip-docs` → docs are updated once at the end by the parent, not per sub-task.
+   - `--no-epic` → prevents recursive epic detection on sub-tasks.
+   - `--child` → suppresses QA offer and session persistence (parent manages context).
+
+   Each sub-task agent gets the **full do-issue flow**: AGENTS.md standards, approach confirmation, quality gate, review, review triage — all automatically. **The sub-task agent must complete all steps including review** — do not allow early exits.
 
 2. Wait for all agents in the tier to complete before starting the next tier.
 
 3. After each tier completes:
    - Check which sub-tasks succeeded and which failed
-   - **Verify reviews were posted:** For each successful sub-task PR, check that a code review comment exists on the PR (look for "## Code Review" in PR comments). If a sub-task agent skipped the review, run `/review-pr {repo}#{pr_number}` yourself before merging.
+   - **Verify reviews were posted:** For each successful sub-task PR, check that a code review comment exists on the PR (look for "## Code Review" in PR comments). If a sub-task agent skipped the review, run `/review-pr {repo_shorthand}#{pr_number}` yourself before merging.
    - For failed sub-tasks, record the error and continue with the next tier (don't block the whole run)
    - Merge successful PRs into the integration branch via `mcp__gitea__pull_request_write` with `merge_style: "merge"` and `delete_branch: true`
 
@@ -424,9 +442,10 @@ Use `mcp__gitea__pull_request_write` with method `create`:
 - `body`: Include:
   - Summary of what was changed and why
   - List of files changed
-  - `Closes #{index}` to auto-close the issue on merge
+  - If `--base-branch` is set: `Part of #{parent_index}` (using the value from `--parent-index`) and `Closes #{index}` (auto-close the sub-task)
+  - If no `--base-branch`: `Closes #{index}` to auto-close the issue on merge
 - `head`: the feature branch name
-- `base`: the repo's default branch
+- `base`: if `--base-branch` is set, use that value (verify the branch exists on the remote first — if not, halt with an error); otherwise use the repo's default branch
 
 **IMPORTANT — PR body formatting:** Pass the `body` parameter as a real multi-line string with actual newlines. Do NOT use `\n` escape sequences — the Gitea MCP tool stores them literally, producing a single-line blob of `\n` characters instead of rendered markdown. Just write the body naturally across multiple lines in the parameter value.
 
@@ -484,6 +503,8 @@ Responding to review comments:
 
 ## Step 11: Update documentation
 
+**If `--skip-docs` flag is set, skip this step entirely.** Epic mode handles docs once at the end for the whole feature.
+
 After the code changes are finalized, check if the repo's README or other user-facing docs need updating to reflect the new functionality.
 
 1. Read the repo's `README.md` (use `mcp__gitea__get_file_contents` or the local file)
@@ -512,3 +533,17 @@ Tell the user:
 4. **Review results** — findings from `/review-pr`
 5. **Review triage** — what was fixed, what became new issues, what was declined
 6. **Docs** — whether README/docs were updated (and PR link if so)
+
+## Step 13: Offer QA (standalone only)
+
+**Skip this step if any of these are true** (checked in order):
+1. `--child` flag is set (canonical signal — parent manages the workflow)
+2. Session file exists with a different `Skill:` header (fallback for invocations that omit `--child`)
+
+QA is offered only when do-issue runs standalone.
+
+Use `AskUserQuestion`:
+- **Run QA now** — invoke `/qa-pr {repo_shorthand}#{pr_number}`
+- **Skip QA** — done
+
+This lets the user immediately verify the PR on the dev environment without having to remember to run `/qa-pr` manually.
