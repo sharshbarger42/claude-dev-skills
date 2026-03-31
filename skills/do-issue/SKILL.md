@@ -25,7 +25,7 @@ When override flags are present, parse them from the argument string after the i
 
 ## Session persistence
 
-!`cat $HOME/.claude/development-skills/lib/session-state.md`
+!`cat $HOME/.config/development-skills/lib/session-state.md`
 
 At skill start, call **Session Read** to check for prior context. Then call **Session Write** after these milestones:
 - After Step 2 (issue fetched — record issue title, body summary)
@@ -43,11 +43,11 @@ Extract `owner`, `repo`, and issue `index` from the argument.
 
 ### Repo resolution
 
-!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
 
 ## Step 1b: Establish identity and check for conflicts
 
-!`cat $HOME/.claude/development-skills/lib/agent-identity.md`
+!`cat $HOME/.config/development-skills/lib/agent-identity.md`
 
 Derive your `AGENT_NAME` for this session.
 
@@ -56,9 +56,9 @@ Then check if another agent is already working on this issue:
 1. Fetch the issue's current labels. If `status: in-progress` is present, another agent may already be on it.
 2. If Agent Mail is available, query for active work on this issue:
 
-!`cat $HOME/.claude/development-skills/lib/agent-coordination.md`
+!`cat $HOME/.config/development-skills/lib/agent-coordination.md`
 
-!`cat $HOME/.claude/development-skills/lib/discord-notify.md`
+!`cat $HOME/.config/development-skills/lib/discord-notify.md`
 
 Use the **Query Active Work** procedure from `agent-coordination.md`, filtered to this specific issue.
 
@@ -367,7 +367,7 @@ Ask the user whether to:
 
 ## Step 3: Read repo AGENTS.md
 
-!`cat $HOME/.claude/development-skills/lib/fetch-agents-md.md`
+!`cat $HOME/.config/development-skills/lib/fetch-agents-md.md`
 
 ## Step 4: Confirm approach with user
 
@@ -399,7 +399,7 @@ Use worktree isolation so the main working tree stays clean:
 3. `git checkout {default_branch} && git pull origin {default_branch}`
 4. Create the branch: `git checkout -b {branch_prefix}/{index}-{short-slug}`
 
-!`cat $HOME/.claude/development-skills/lib/status-labels.md`
+!`cat $HOME/.config/development-skills/lib/status-labels.md`
 
 9. **Register active work:** After setting `status: in-progress`, register via Agent Mail and post a "Started Work" Discord notification using the procedures from `agent-coordination.md` and `discord-notify.md` (loaded in Step 1b). This is best-effort — if either fails, continue.
 
@@ -430,7 +430,7 @@ Do NOT skip writing tests because "it's a small change." Every behavioral change
 
 ### 7a: Run the quality gate
 
-!`cat $HOME/.claude/development-skills/lib/quality-gate.md`
+!`cat $HOME/.config/development-skills/lib/quality-gate.md`
 
 Run the quality gate procedure on all files you changed in Step 6. Do NOT skip this step.
 
@@ -452,7 +452,7 @@ New tests written in Step 6 must pass here. If they don't, fix the implementatio
 
 Include any files that the quality gate auto-formatted when staging.
 
-!`cat $HOME/.claude/development-skills/lib/commit-push.md`
+!`cat $HOME/.config/development-skills/lib/commit-push.md`
 
 **Iterative fix-ups during implementation:** If the quality gate finds issues caused by your code in Step 6, fix them and fold the fix into the original commit using the Clean History Rules above. The branch should have one clean commit per logical change when you push.
 
@@ -479,13 +479,13 @@ After creating the PR:
 1. **Update the issue status label:** replace `status: in-progress` with `status: in-review` on the issue (see status-labels.md above for the swap procedure).
 2. **Apply PR status label:** set `pr: needs-review` on the PR (see pr-status-labels.md for the swap procedure).
 
-!`cat $HOME/.claude/development-skills/lib/pr-status-labels.md`
+!`cat $HOME/.config/development-skills/lib/pr-status-labels.md`
 
 **Fix mode note:** If `FIX_MODE = true`, the PR already exists — skip PR creation entirely. Instead, swap `status: in-progress` to `status: ready-to-test` on the issue, and set the PR label based on deploy config:
 - Repo has dev deploy config → set `pr: awaiting-dev-verification`
 - Repo has no dev deploy config → set `pr: ready-to-merge`
 
-!`cat $HOME/.claude/development-skills/lib/deploy-aware-label.md`
+!`cat $HOME/.config/development-skills/lib/deploy-aware-label.md`
 
 Then jump to Step 12.
 

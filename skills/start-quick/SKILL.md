@@ -25,7 +25,7 @@ Do NOT summarize the whole file — just internalize it.
 
 If a repo name was provided as `$ARGUMENTS`, orient yourself on that repo:
 
-1. **Resolve the repo path** using the shorthand table in `~/.claude/development-skills/config/repos.md`. If the name matches a known shorthand, use that local path. Otherwise try `~/gitea-repos/<repo>/`.
+1. **Resolve the repo path** using the shorthand table in `~/.config/development-skills/config/repos.md`. If the name matches a known shorthand, use that local path. Otherwise try `~/gitea-repos/<repo>/`.
 
 2. **Read the repo's AGENTS.md** (at `<repo-path>/AGENTS.md`). This has repo-specific rules, architecture, and conventions. Internalize it — don't summarize it back.
 

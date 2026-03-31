@@ -33,7 +33,7 @@ If no argument is provided, ask the user for a plan path or issue reference.
 
 1. Parse using repo resolution logic:
 
-!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
 
 2. Fetch the issue body via `mcp__gitea__issue_read`
 3. Also fetch comments — they may contain additional plan details or sub-issue breakdowns

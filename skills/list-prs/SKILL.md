@@ -18,7 +18,7 @@ If no argument is provided, scan all repos.
 
 ### Repo resolution
 
-!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
 
 If a specific repo was given, scan only that repo. Otherwise scan every repo in the shorthand table.
 
@@ -32,7 +32,7 @@ Collect each PR's: `owner`, `repo`, `index`, `title`, `head.ref` (branch), `head
 
 ## Step 3: Determine status — label fast path
 
-!`cat $HOME/.claude/development-skills/lib/pr-status-labels.md`
+!`cat $HOME/.config/development-skills/lib/pr-status-labels.md`
 
 Check each PR's labels for a `pr:` status label (`pr: needs-review`, `pr: comments-pending`, `pr: awaiting-dev-verification`, `pr: awaiting-prod-verification`, `pr: ready-to-merge`).
 

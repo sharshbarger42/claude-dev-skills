@@ -233,7 +233,7 @@ The productivity-hooks plugin and skills rely on config documents at `~/.config/
 - **`infrastructure.md`** — IPs, domains, service URLs for the homelab environment. Used by `/investigate-bug`, `/qa-pr`, and injected on every prompt.
 - **`deploy-config.md`** — deploy configuration table mapping repos to deploy workflows, dev URLs, chart names, and namespaces. Used by `/dev-deploy` and `/qa-pr`.
 
-These live at `~/.config/development-skills/` (preferred) or fall back to `~/.claude/development-skills/config/`.
+These live at `~/.config/development-skills/` (preferred) or fall back to the repo checkout.
 
 ```
 AskUserQuestion:
@@ -275,7 +275,7 @@ mkdir -p ~/.config/development-skills/
 
 6. Present the generated table and ask the user to confirm or edit before saving.
 
-7. Write to `~/.config/development-skills/repos.md` only. Do NOT write to `~/.claude/development-skills/config/` — that path is a symlink into the git-tracked repo and should not contain generated per-user config. The `on-prompt.sh` hook and `resolve-repo.md` both check `~/.config/development-skills/` first.
+7. Write to `~/.config/development-skills/repos.md` only. The canonical runtime location is `~/.config/development-skills/`.
 
 #### infrastructure.md
 
@@ -448,8 +448,8 @@ Create `~/AGENTS.md` if it doesn't exist. This is the workspace-level guide that
 
 ## Config
 
-- Repo shorthand: ~/.claude/development-skills/config/repos.md
-- Infrastructure: ~/.claude/development-skills/config/infrastructure.md
+- Repo shorthand: ~/.config/development-skills/config/repos.md
+- Infrastructure: ~/.config/development-skills/config/infrastructure.md
 ```
 
 ### 4c. Install Plugins

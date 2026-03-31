@@ -3,8 +3,7 @@
 # Injects development workflow context: Gitea coordination, project map, infrastructure.
 set -uo pipefail
 
-SKILLS_DIR="$HOME/.claude/development-skills"
-LOCAL_CONFIG="$HOME/.config/development-skills"
+CONFIG_DIR="$HOME/.config/development-skills"
 
 # Read user prompt from stdin JSON (hook receives JSON with "prompt" field)
 USER_PROMPT=""
@@ -22,12 +21,12 @@ REMINDERS (from dev-workflow-hooks plugin):
 
 RULES
 
-# Inline project map (local config first, fall back to repo)
+# Inline project map
 repos_file=""
-if [[ -f "$LOCAL_CONFIG/repos.md" ]]; then
-    repos_file="$LOCAL_CONFIG/repos.md"
-elif [[ -f "$SKILLS_DIR/config/repos.md" ]]; then
-    repos_file="$SKILLS_DIR/config/repos.md"
+if [[ -f "$CONFIG_DIR/repos.md" ]]; then
+    repos_file="$CONFIG_DIR/repos.md"
+elif [[ -f "$CONFIG_DIR/config/repos.md" ]]; then
+    repos_file="$CONFIG_DIR/config/repos.md"
 fi
 
 if [[ -n "$repos_file" ]]; then
@@ -37,12 +36,12 @@ if [[ -n "$repos_file" ]]; then
     echo "</project-map>"
 fi
 
-# Inline infrastructure reference (local config first, fall back to repo)
+# Inline infrastructure reference
 infra_file=""
-if [[ -f "$LOCAL_CONFIG/infrastructure.md" ]]; then
-    infra_file="$LOCAL_CONFIG/infrastructure.md"
-elif [[ -f "$SKILLS_DIR/config/infrastructure.md" ]]; then
-    infra_file="$SKILLS_DIR/config/infrastructure.md"
+if [[ -f "$CONFIG_DIR/infrastructure.md" ]]; then
+    infra_file="$CONFIG_DIR/infrastructure.md"
+elif [[ -f "$CONFIG_DIR/config/infrastructure.md" ]]; then
+    infra_file="$CONFIG_DIR/config/infrastructure.md"
 fi
 
 if [[ -n "$infra_file" ]]; then
@@ -52,16 +51,10 @@ if [[ -n "$infra_file" ]]; then
     echo "</infrastructure-reference>"
 fi
 
-# Inline MCP-specific guides from lib/ — only when the prompt is relevant
+# Inline MCP-specific guides — only when the prompt is relevant
 if [[ -n "$USER_PROMPT" ]] && printf '%s\n' "$USER_PROMPT" | grep -qiE '/actions/runs/|action.?run|workflow.?run|job.?log|ci.?(fail|pass|status|check)|actions.?(fail|broke|error)'; then
-    gitea_guide=""
-    if [[ -f "$SKILLS_DIR/lib/gitea-mcp-guide.md" ]]; then
-        gitea_guide="$SKILLS_DIR/lib/gitea-mcp-guide.md"
-    elif [[ -f "$(dirname "$(dirname "$(dirname "$0")")")/../lib/gitea-mcp-guide.md" ]]; then
-        gitea_guide="$(dirname "$(dirname "$(dirname "$0")")")/../lib/gitea-mcp-guide.md"
-    fi
-
-    if [[ -n "$gitea_guide" ]]; then
+    gitea_guide="$CONFIG_DIR/lib/gitea-mcp-guide.md"
+    if [[ -f "$gitea_guide" ]]; then
         echo ""
         echo "<gitea-mcp-guide>"
         cat "$gitea_guide"

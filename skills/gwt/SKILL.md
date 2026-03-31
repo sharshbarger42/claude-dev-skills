@@ -13,7 +13,7 @@ If `--with-data` is included in the arguments, also explore the codebase to anno
 
 ## Step 1 — Resolve the issue
 
-!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
 
 Parse the issue reference from `$ARGUMENTS` using the resolution logic above. Then fetch the issue using `mcp__gitea__get_issue_by_index`.
 

@@ -18,21 +18,21 @@ Investigate a bug report end-to-end: gather symptoms, diagnose root cause across
 
 ### Repo resolution
 
-!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
 
 ### Agent identity
 
-!`cat $HOME/.claude/development-skills/lib/agent-identity.md`
+!`cat $HOME/.config/development-skills/lib/agent-identity.md`
 
 Derive your `AGENT_NAME` for this session.
 
 ### Discord notifications
 
-!`cat $HOME/.claude/development-skills/lib/discord-notify.md`
+!`cat $HOME/.config/development-skills/lib/discord-notify.md`
 
 ### Infrastructure reference
 
-!`cat $HOME/.claude/development-skills/config/infrastructure.md`
+!`cat $HOME/.config/development-skills/config/infrastructure.md`
 
 Load the infrastructure reference table — needed to map services to IPs, containers, and nodes.
 
@@ -282,7 +282,7 @@ The final criterion must always be: `Human verification: {brief description of w
 
 Create the issue with `mcp__gitea__create_issue`, then label it:
 
-!`cat $HOME/.claude/development-skills/lib/label-issue.md`
+!`cat $HOME/.config/development-skills/lib/label-issue.md`
 
 ### Cross-referencing
 

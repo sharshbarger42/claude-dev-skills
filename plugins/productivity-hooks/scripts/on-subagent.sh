@@ -2,7 +2,7 @@
 # Runs when a subagent starts.
 # Stdout is injected into the subagent's context so it inherits project rules.
 
-SKILLS_DIR="$HOME/.claude/development-skills"
+SKILLS_DIR="$HOME/.config/development-skills"
 
 # Find AGENTS.md — prefer current directory, then home
 AGENTS_FILE=""

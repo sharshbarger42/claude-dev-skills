@@ -21,7 +21,7 @@ Extract `owner`, `repo`, and optional PR `index` from the argument.
 
 ### Repo resolution
 
-!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
 
 ### If no argument was provided
 
@@ -47,7 +47,7 @@ If no open PRs, tell the user and stop.
 
 For each PR, run the shared check-ci procedure:
 
-!`cat $HOME/.claude/development-skills/lib/check-ci.md`
+!`cat $HOME/.config/development-skills/lib/check-ci.md`
 
 ## Step 4: Report results
 

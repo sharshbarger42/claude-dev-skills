@@ -21,7 +21,7 @@ Extract `owner`, `repo`, and optional PR `index` from the argument.
 
 ### Repo resolution
 
-!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
 
 ### If no argument was provided
 
@@ -141,7 +141,7 @@ After each PR, log the result:
 
 Use the shared check-ci procedure for accurate CI status:
 
-!`cat $HOME/.claude/development-skills/lib/check-ci.md`
+!`cat $HOME/.config/development-skills/lib/check-ci.md`
 
 For each PR that was successfully rebased (status = `rebased`):
 

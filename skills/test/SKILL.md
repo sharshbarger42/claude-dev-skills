@@ -15,7 +15,7 @@ Plan, document, and execute end-to-end tests for Gitea issue **$ARGUMENTS**.
 
 1. **Resolve and fetch the issue.**
 
-   !`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
+   !`cat $HOME/.config/development-skills/lib/resolve-repo.md`
 
    Parse `$ARGUMENTS` using the resolution logic above. Fetch with `mcp__gitea__get_issue_by_index`. Also fetch comments with `mcp__gitea__get_issue_comments_by_index`. Capture:
    - Title, body, acceptance criteria

@@ -21,7 +21,7 @@ Extract `owner`, `repo`, and PR `index` from the argument.
 
 ### Repo resolution
 
-!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
 
 ## Step 2: Fetch PR metadata
 
@@ -634,7 +634,7 @@ The deploy workflow failed before smoke tests could run. Check the [workflow run
 
 ## Step 8.25: Update PR status label
 
-!`cat $HOME/.claude/development-skills/lib/pr-status-labels.md`
+!`cat $HOME/.config/development-skills/lib/pr-status-labels.md`
 
 After posting the PR comment, update the PR's status label:
 

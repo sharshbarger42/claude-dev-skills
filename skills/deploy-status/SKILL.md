@@ -11,7 +11,7 @@ Verify the full deployment pipeline for a repo: CI on main, Flux reconciliation,
 
 ## Repo and Issue Resolution
 
-!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
 
 ## Step 1: Parse arguments
 

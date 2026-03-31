@@ -15,7 +15,7 @@ If no argument is provided, ask which repos to scan.
 
 ## Session persistence
 
-!`cat $HOME/.claude/development-skills/lib/session-state.md`
+!`cat $HOME/.config/development-skills/lib/session-state.md`
 
 At skill start, call **Session Read** to check for prior context. Then call **Session Write** after these milestones:
 - After Step 2 (PRs listed — record which PRs found and their status)
@@ -32,7 +32,7 @@ If an argument was provided, extract `owner` and `repo`.
 
 ### Repo resolution
 
-!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
 
 If **no argument** was provided, use `AskUserQuestion` with these options:
 - **All repos** — scan every repo in the shorthand table above
@@ -83,7 +83,7 @@ Mark each PR as `ready` or `not ready ({N} unaddressed comments)`.
 
 Use the shared check-ci procedure for accurate CI status:
 
-!`cat $HOME/.claude/development-skills/lib/check-ci.md`
+!`cat $HOME/.config/development-skills/lib/check-ci.md`
 
 For each PR marked `ready` from Step 3:
 
@@ -121,7 +121,7 @@ If the failure is fixable:
 4. Fix each error — edit the files, staying within the scope of what's needed to pass CI
 5. Commit and push the fix:
 
-!`cat $HOME/.claude/development-skills/lib/commit-push.md`
+!`cat $HOME/.config/development-skills/lib/commit-push.md`
 
    **CI fix override:** If the CI failure was caused by PR code (not base-branch drift), amend the fix into the relevant commit instead of creating a new one: `git add <fixed_files> && git commit --amend --no-edit && git push --force-with-lease origin {head_branch}`. If the failure is from base-branch drift (e.g., a new lint rule on main), a separate fix commit is acceptable.
 6. Wait for CI to re-run (poll every 30s for up to 5 minutes)
@@ -236,9 +236,9 @@ Record the merge timestamp for each successfully merged PR.
 
 ### Apply post-merge label
 
-!`cat $HOME/.claude/development-skills/lib/pr-status-labels.md`
+!`cat $HOME/.config/development-skills/lib/pr-status-labels.md`
 
-!`cat $HOME/.claude/development-skills/lib/deploy-aware-label.md`
+!`cat $HOME/.config/development-skills/lib/deploy-aware-label.md`
 
 After each successful merge, check the deploy config for the repo:
 - Repo **has** prod deploy config → set `pr: awaiting-prod-verification` on the PR
@@ -246,7 +246,7 @@ After each successful merge, check the deploy config for the repo:
 
 **Discord notification:** After each successful merge, post a "PR Merged" Discord notification using the green embed template:
 
-!`cat $HOME/.claude/development-skills/lib/discord-notify.md`
+!`cat $HOME/.config/development-skills/lib/discord-notify.md`
 
 Read the webhook URL from `~/.config/development-skills/discord-webhook`. If the file doesn't exist, skip silently. Include the PR title, repo, PR number, and merge style in the notification. Use your agent name (derive it once at the start of the skill using the agent identity logic from `agent-identity.md`).
 
@@ -303,7 +303,7 @@ Dynamically discover whether the repo defines a post-merge health check — do N
 
 For each merged repo:
 
-!`cat $HOME/.claude/development-skills/lib/fetch-agents-md.md`
+!`cat $HOME/.config/development-skills/lib/fetch-agents-md.md`
 
 Then extract health check configuration:
 1. Look for a `## Post-Merge Checklist` section in the file content
@@ -336,7 +336,7 @@ Body: PR #{pr_index} ({pr_title}) was merged and the deploy workflow completed s
 
 Create with `mcp__gitea__create_issue`, then label it:
 
-!`cat $HOME/.claude/development-skills/lib/label-issue.md`
+!`cat $HOME/.config/development-skills/lib/label-issue.md`
 
 ### If deploy failed
 

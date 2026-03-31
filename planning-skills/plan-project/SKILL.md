@@ -10,7 +10,7 @@ Create a comprehensive, implementation-ready project plan. Research modern stand
 
 **Input:** Either a path to an existing plan directory (containing `analysis.md` from `/analyze-idea`), or a free-text idea description to plan from scratch.
 
-!`cat $HOME/.claude/development-skills/lib/planning-common.md`
+!`cat $HOME/.config/development-skills/lib/planning-common.md`
 
 ## Step 1: Gather context
 

@@ -36,7 +36,7 @@ These variables flow between skill invocations. Extract them explicitly after ea
 
 ## Session persistence
 
-!`cat $HOME/.claude/development-skills/lib/session-state.md`
+!`cat $HOME/.config/development-skills/lib/session-state.md`
 
 At skill start, call **Session Read** to check for prior context. Then call **Session Write** after these milestones, recording the inter-skill variables in the Context section:
 - After Step 1 (repo resolved — record `{owner}`, `{repo}`, `{repo_shorthand}`)
@@ -56,7 +56,7 @@ Extract `owner` and `repo` from the argument.
 
 #### Repo resolution
 
-!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
 
 ### If no argument was provided
 
@@ -71,11 +71,11 @@ Infer the repo from the current working directory:
 
 ## Step 1b: Establish identity and discover active work
 
-!`cat $HOME/.claude/development-skills/lib/agent-identity.md`
+!`cat $HOME/.config/development-skills/lib/agent-identity.md`
 
 Derive your `AGENT_NAME` for this session.
 
-!`cat $HOME/.claude/development-skills/lib/discord-notify.md`
+!`cat $HOME/.config/development-skills/lib/discord-notify.md`
 
 The `/triage-issues` child skill includes `agent-coordination.md` and will report any in-progress items from other agents. Use that output in Step 3 to exclude them from the options.
 
