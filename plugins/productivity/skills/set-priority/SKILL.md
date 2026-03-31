@@ -24,7 +24,7 @@ Otherwise, extract `owner`, `repo`, and `issue_index` from the argument.
 
 ### Repo resolution
 
-!`cat $HOME/gitea-repos/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
 
 ## Step 2: Fetch the issue
 
