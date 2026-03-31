@@ -459,14 +459,15 @@ Check if plugins are installed, and show install commands if not:
 ```bash
 claude plugin list 2>/dev/null | grep -q "sound-notifications" || echo "Not installed: sound-notifications"
 claude plugin list 2>/dev/null | grep -q "productivity-hooks" || echo "Not installed: productivity-hooks"
+claude plugin list 2>/dev/null | grep -q "dev-workflow-hooks" || echo "Not installed: dev-workflow-hooks"
 ```
 
 If not installed, offer to install them using AskUserQuestion:
 
 ```
 AskUserQuestion:
-  question: "Install sound-notifications and productivity-hooks plugins?"
-  options: ["Yes, install both", "Skip plugins"]
+  question: "Install plugins? (productivity-hooks = guardrails, dev-workflow-hooks = Gitea/project context, sound-notifications = audio alerts)"
+  options: ["Yes, install all", "Skip dev-workflow (productivity + sound only)", "Skip plugins"]
 ```
 
 If yes:
@@ -474,6 +475,7 @@ If yes:
 claude plugin marketplace add ~/gitea-repos/development-skills 2>/dev/null || claude plugin marketplace add ~/development-skills 2>/dev/null
 claude plugin install sound-notifications@super-werewolves-skills --scope user
 claude plugin install productivity-hooks@super-werewolves-skills --scope user
+claude plugin install dev-workflow-hooks@super-werewolves-skills --scope user
 ```
 
 Report status of each plugin.
