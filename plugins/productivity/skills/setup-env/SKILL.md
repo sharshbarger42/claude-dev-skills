@@ -457,7 +457,7 @@ Create `~/AGENTS.md` if it doesn't exist. This is the workspace-level guide that
 Before installing plugins, check for old symlink-based skill installations:
 
 ```bash
-ls -la ~/.claude/skills/ 2>/dev/null | grep '\->' | head -5
+find ~/.claude/skills/ -maxdepth 1 -type l 2>/dev/null | head -5
 ```
 
 If symlinks are found in `~/.claude/skills/`, ask the user:
@@ -470,7 +470,7 @@ AskUserQuestion:
 
 If "Yes, clean up symlinks":
 ```bash
-rm -f ~/.claude/skills/check-ci ~/.claude/skills/clear-session ~/.claude/skills/deploy-dev ~/.claude/skills/deploy-status ~/.claude/skills/do-issue ~/.claude/skills/do-the-thing ~/.claude/skills/fix-pr ~/.claude/skills/gwt ~/.claude/skills/hallucination-check ~/.claude/skills/investigate-bug ~/.claude/skills/issue-summary ~/.claude/skills/list-prs ~/.claude/skills/merge-prs ~/.claude/skills/qa-pr ~/.claude/skills/review-pr ~/.claude/skills/set-priority ~/.claude/skills/setup-env ~/.claude/skills/start ~/.claude/skills/start-quick ~/.claude/skills/status ~/.claude/skills/test ~/.claude/skills/triage-issues ~/.claude/skills/update-prs ~/.claude/skills/verify-pr ~/.claude/skills/analyze-idea ~/.claude/skills/create-issues ~/.claude/skills/plan-project ~/.claude/skills/plan-the-thing
+find ~/.claude/skills/ -maxdepth 1 -type l -exec rm -f {} +
 ```
 
 Report how many symlinks were removed. If no symlinks were found, skip silently.

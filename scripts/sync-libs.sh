@@ -10,12 +10,13 @@ echo "Syncing libs from $REPO_DIR to $CANONICAL_DIR..."
 
 # Sync lib/ files
 mkdir -p "$CANONICAL_DIR/lib"
-cp -u "$REPO_DIR"/lib/*.md "$CANONICAL_DIR/lib/" 2>/dev/null || true
+cp "$REPO_DIR"/lib/*.md "$CANONICAL_DIR/lib/" 2>/dev/null || echo "Warning: no lib files found to sync"
 echo "  lib/: $(ls "$CANONICAL_DIR/lib/" | wc -l) files"
 
 # Sync config/ files (repos.md, infrastructure.md, deploy-config.md)
 # Only copy if the canonical file doesn't exist — don't overwrite per-machine config
 mkdir -p "$CANONICAL_DIR/config"
+shopt -s nullglob
 for f in "$REPO_DIR"/config/*.md; do
     basename="$(basename "$f")"
     if [[ ! -f "$CANONICAL_DIR/config/$basename" ]]; then
