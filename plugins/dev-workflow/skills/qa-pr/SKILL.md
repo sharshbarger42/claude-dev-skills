@@ -13,13 +13,15 @@ Deploy a pull request to the dev environment and run smoke tests. Posts results 
 - Owner/repo: `super-werewolves/food-automation#32`
 - Full URL: `https://git.home.superwerewolves.ninja/super-werewolves/food-automation/pulls/32`
 
+**QA tests deployed code only.** Unit tests, linting, and formatting are development-phase checks run by `/do-issue`. QA verifies that the deployed application works end-to-end in the dev environment.
+
 ## Step 1: Parse the PR reference
 
 Extract `owner`, `repo`, and PR `index` from the argument.
 
 ### Repo resolution
 
-!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
+!`cat $HOME/.claude/development-skills/lib/resolve-repo.md`
 
 ## Step 2: Fetch PR metadata
 
@@ -277,7 +279,7 @@ Every test criterion in the issue MUST start with one of these labels. These lab
 | Label | Meaning | QA skill behavior | Verified on |
 |-------|---------|-------------------|-------------|
 | `[ai-verify]` | Fully testable by AI via HTTP requests against the dev environment | **Execute and report pass/fail.** No exceptions — the AI must run the test. | `dev` |
-| `[local-test]` | Locally runnable checks — lint, unit tests, build, type-check | **Run the command locally in the repo checkout and report pass/fail.** | `local` |
+| `[local-test]` | Lint, unit tests, build, type-check (dev-phase) | **Not executed during QA — record as `skipped (dev-phase)`.** Verified during development by `/do-issue`. | `dev-phase` |
 | `[ci-check]` | Verify CI/CD pipeline passed for this PR | **Check action run status via Gitea API and report pass/fail.** | `ci` |
 | `[subtask-check]` | Verify all subtasks and/or blockers are completed | **Fetch linked issues, check all are closed. Report pass/fail.** | `n/a` |
 | `[human-verify]` | Requires a human to verify (visual judgment, UX feel, interactive behavior) | **Skip execution.** Record as `pending`. The human will verify separately. | — |
@@ -294,7 +296,7 @@ Every test criterion in the issue MUST start with one of these labels. These lab
 Split extracted criteria into these lists:
 
 1. **`ai_verify`** — criteria labeled `[ai-verify]` (or unlabeled). These MUST be executed against dev.
-2. **`local_test`** — criteria labeled `[local-test]`. These MUST be executed locally in the repo checkout.
+2. **`local_test`** — criteria labeled `[local-test]`. These are **not executed during QA** — they are verified during development by `/do-issue`. Record as `skipped (dev-phase)`.
 3. **`ci_check`** — criteria labeled `[ci-check]`. These MUST be verified via Gitea API.
 4. **`subtask_check`** — criteria labeled `[subtask-check]`. These MUST be verified via Gitea API.
 5. **`human_verify`** — criteria labeled `[human-verify]`. These are recorded as pending.
@@ -303,7 +305,7 @@ Split extracted criteria into these lists:
 
 ### Step 6.7: Plan test execution
 
-For each `[ai-verify]` and `[human-assist]` criterion, plan HOW to test it against the live dev environment:
+For each `[ai-verify]` and `[human-assist]` criterion, plan HOW to test it against the live dev environment. Do not plan execution for `[local-test]` criteria — those are development-phase checks handled by `/do-issue`.
 
 1. **Read the criterion carefully** — understand what state or behavior it's verifying
 2. **Identify prerequisite actions** — does the test require creating data first? (e.g., POST to ingest a ticket before checking its state)
@@ -374,22 +376,13 @@ After running smoke tests, execute the issue test criteria by label. Follow the 
 4. **Mark the criterion source as `issue`** and label as `ai-verify`.
 5. **There is no "skipped" status.** Every `[ai-verify]` criterion must be either `passed` or `failed`. Infrastructure issues (endpoint down, 500 error) = `failed`.
 
-#### `[local-test]` criteria — run locally and report
+#### `[local-test]` criteria — not executed during QA
 
-1. **Resolve the repo's local path** from the shorthand table (same as fix-pr).
-2. **Check out the PR branch** locally:
-   ```bash
-   cd {local_path}
-   git fetch origin
-   git checkout {head_branch} && git pull origin {head_branch}
-   ```
-3. **For each `[local-test]` criterion**, parse what to run:
-   - If the criterion text contains a command (backtick-wrapped or after "run:"), execute that exact command
-   - If it says "lint" or "linting", detect the project's linter from config files (`ruff` for Python, `eslint` for JS/TS, `ansible-lint` for Ansible, `yamllint` for YAML) and run it
-   - If it says "tests" or "unit tests", detect the test runner (`pytest`, `npm test`, `go test`, `cargo test`) and run it
-   - If it says "build" or "type-check", detect the build command (`npm run build`, `tsc --noEmit`, `go build ./...`) and run it
-4. **Record result** as `passed` (exit code 0) or `failed` (non-zero exit code). Include truncated stdout/stderr (500 chars max).
-5. **Set `verified_on: local`** for each result.
+**`[local-test]` criteria are not executed during QA.** They are verified during development by `/do-issue`. If present, record them as `skipped (dev-phase)` in the results.
+
+For each `[local-test]` criterion:
+1. **Record result** as `"skipped (dev-phase)"` with detail: `"Verified during development by /do-issue"`
+2. **Set `verified_on: "dev-phase"`** for each result.
 
 #### `[ci-check]` criteria — verify CI passed
 
@@ -457,15 +450,16 @@ These are NOT executed. Record each as `pending` with a note that human signoff 
 ### Collecting results
 
 Build a results list. The `passed` field has these possible values:
-- `true` — test executed and passed (smoke tests + `[ai-verify]` + `[local-test]` + `[ci-check]` + `[subtask-check]`)
+- `true` — test executed and passed (smoke tests + `[ai-verify]` + `[ci-check]` + `[subtask-check]`)
 - `false` — test executed and failed (any automated criterion)
+- `"skipped (dev-phase)"` — `[local-test]` criterion (verified during development by `/do-issue`, not during QA)
 - `"pending-human-check"` — `[human-assist]` criterion where AI setup succeeded, awaiting human confirmation
 - `"pending"` — `[human-verify]` criterion (never executed)
 - `"pending-post-merge"` — `[post-merge]` criterion (cannot run until after merge to main)
 - `"pending-ci"` — `[ci-check]` criterion where CI is still running
 
 Every result MUST include a `verified_on` field indicating where the test was executed:
-- `"local"` — ran in local repo checkout (`[local-test]`)
+- `"dev-phase"` — verified during development, not during QA (`[local-test]`)
 - `"dev"` — ran against dev environment (`[ai-verify]`, `[human-assist]`, smoke tests)
 - `"ci"` — verified via CI/CD pipeline status (`[ci-check]`)
 - `"prod"` — verified on production (only after merge, used by `/merge-prs`)
@@ -475,7 +469,7 @@ Every result MUST include a `verified_on` field indicating where the test was ex
 [
   { "name": "Health check", "source": "smoke", "label": "smoke", "endpoint": "/api/health", "status": 200, "passed": true, "verified_on": "dev", "detail": "" },
   { "name": "Task list", "source": "smoke", "label": "smoke", "endpoint": "/api/tasks", "status": 500, "passed": false, "verified_on": "dev", "detail": "Internal server error: database locked" },
-  { "name": "Lint passes", "source": "issue", "label": "local-test", "endpoint": "-", "status": "-", "passed": true, "verified_on": "local", "detail": "ruff check . — exit 0" },
+  { "name": "Lint passes", "source": "issue", "label": "local-test", "endpoint": "-", "status": "-", "passed": "skipped (dev-phase)", "verified_on": "dev-phase", "detail": "Verified during development by /do-issue" },
   { "name": "CI pipeline passes", "source": "issue", "label": "ci-check", "endpoint": "-", "status": "-", "passed": true, "verified_on": "ci", "detail": "All 3 action runs passed" },
   { "name": "All subtasks closed", "source": "issue", "label": "subtask-check", "endpoint": "-", "status": "-", "passed": false, "verified_on": "n/a", "detail": "#42 still open: 'Add error handling'" },
   { "name": "Stuck task in action-required", "source": "issue", "label": "ai-verify", "endpoint": "/api/action-required", "status": 200, "passed": true, "verified_on": "dev", "detail": "Created stuck task, confirmed in action-required with source:'stuck'" },
@@ -492,12 +486,12 @@ Compose and post a PR comment using `mcp__gitea__create_issue_comment` with the 
 
 ### Compute overall verdict
 
-The verdict is determined by all automated criteria: smoke tests + `[ai-verify]` + `[local-test]` + `[ci-check]` + `[subtask-check]`. Non-blocking criteria (`[human-assist]`, `[human-verify]`, `[post-merge]`) are reported separately but do not affect the verdict.
+The verdict is determined by QA-phase automated criteria: smoke tests + `[ai-verify]` + `[ci-check]` + `[subtask-check]`. Non-blocking criteria (`[human-assist]`, `[human-verify]`, `[post-merge]`) are reported separately but do not affect the verdict. **`[local-test]` criteria do not affect the QA verdict** — they are development-phase checks verified by `/do-issue` and appear in the results table as "Verified during development" for informational purposes only.
 
-- **QA Passed** — every smoke test, `[ai-verify]`, `[local-test]`, `[ci-check]`, and `[subtask-check]` criterion passed. `[human-assist]` setups succeeded (but human confirmation still needed). Ready for merge pending human checks and post-merge verification.
-- **QA Failed** — one or more automated criteria failed, OR a `[human-assist]` setup failed (AI couldn't create the test conditions).
+- **QA Passed** — every smoke test, `[ai-verify]`, `[ci-check]`, and `[subtask-check]` criterion passed. `[human-assist]` setups succeeded (but human confirmation still needed). Ready for merge pending human checks and post-merge verification.
+- **QA Failed** — one or more QA-phase automated criteria failed, OR a `[human-assist]` setup failed (AI couldn't create the test conditions).
 
-There is no "Partial" or "Skipped" verdict. Every automated criterion is either tested and passed, or tested and failed. `[post-merge]` criteria are always deferred.
+There is no "Partial" or "Skipped" verdict. Every QA-phase automated criterion is either tested and passed, or tested and failed. `[local-test]` criteria are always `skipped (dev-phase)`. `[post-merge]` criteria are always deferred.
 
 ### Deploy summary line
 
@@ -509,7 +503,7 @@ The `{deploy_summary}` should reflect what happened:
 ### If ALL automated tests passed
 
 ```markdown
-✅ **QA Passed** — verified across local, CI, and dev
+✅ **QA Passed** — verified across CI and dev
 
 **Branch:** `{head_branch}` ({head_sha_short})
 **Deploy:** {deploy_summary}
@@ -518,10 +512,10 @@ The `{deploy_summary}` should reflect what happened:
 
 | Test | Type | Env | Result |
 |------|------|-----|--------|
-| Lint passes | `[local-test]` | local | ✅ Pass |
-| Unit tests pass | `[local-test]` | local | ✅ Pass |
 | CI pipeline passes | `[ci-check]` | ci | ✅ Pass |
 | All subtasks closed | `[subtask-check]` | n/a | ✅ Pass |
+| Lint passes | `[local-test]` | dev-phase | ⏭️ Verified during development |
+| Unit tests pass | `[local-test]` | dev-phase | ⏭️ Verified during development |
 
 ### Smoke Tests (dev)
 
@@ -563,7 +557,7 @@ The `{deploy_summary}` should reflect what happened:
 
 ---
 
-All {automated_count} automated tests passed ({local_count} local, {ci_count} CI, {dev_count} dev). {human_assist_count} criteria ready for human spot-check. {human_verify_count} criteria awaiting human signoff. {post_merge_count} criteria deferred to post-merge.
+All {automated_count} QA tests passed ({ci_count} CI, {dev_count} dev). {local_test_count} `[local-test]` criteria verified during development (not counted in QA verdict). {human_assist_count} criteria ready for human spot-check. {human_verify_count} criteria awaiting human signoff. {post_merge_count} criteria deferred to post-merge.
 ```
 
 ### If ANY automated tests failed
@@ -578,9 +572,10 @@ All {automated_count} automated tests passed ({local_count} local, {ci_count} CI
 
 | Test | Type | Env | Result |
 |------|------|-----|--------|
-| Lint passes | `[local-test]` | local | ✅ Pass / ❌ Fail |
 | CI pipeline passes | `[ci-check]` | ci | ✅ Pass / ❌ Fail |
 | All subtasks closed | `[subtask-check]` | n/a | ✅ Pass / ❌ Fail |
+| Lint passes | `[local-test]` | dev-phase | ⏭️ Verified during development |
+| Unit tests pass | `[local-test]` | dev-phase | ⏭️ Verified during development |
 
 ### Smoke Tests (dev)
 
@@ -639,7 +634,7 @@ The deploy workflow failed before smoke tests could run. Check the [workflow run
 
 ## Step 8.25: Update PR status label
 
-!`cat $HOME/.config/development-skills/lib/pr-status-labels.md`
+!`cat $HOME/.claude/development-skills/lib/pr-status-labels.md`
 
 After posting the PR comment, update the PR's status label:
 
@@ -724,13 +719,14 @@ After posting the issue comment, update the **issue body** to check off test cri
    - Replace `- [ ]` with `- [x]`
    - Append a brief annotation: ` — *verified live in PR #{pr_number}*`
 3. For `[ai-verify]` criteria that **failed**, leave them as `- [ ]` (unchecked)
-4. For `[human-assist]` criteria where setup succeeded, leave as `- [ ]` but append: ` — *environment prepared in PR #{pr_number}, awaiting human check*`
-5. For `[human-verify]` criteria, always leave as `- [ ]`
-6. Use `mcp__gitea__issue_write` with `method: "update"` to save the updated body
+4. For `[local-test]` criteria, check them off and annotate: replace `- [ ]` with `- [x]` and append ` — *verified during development by /do-issue*`
+5. For `[human-assist]` criteria where setup succeeded, leave as `- [ ]` but append: ` — *environment prepared in PR #{pr_number}, awaiting human check*`
+6. For `[human-verify]` criteria, always leave as `- [ ]`
+7. Use `mcp__gitea__issue_write` with `method: "update"` to save the updated body
 
 **Important:** Only modify the `- [ ]` / `- [x]` checkboxes and append annotations. Do not alter any other part of the issue body.
 
-**CRITICAL:** Never mark a criterion as `[x]` unless it was actually executed and returned a passing result (`passed: true`). Only `[ai-verify]` criteria can be checked off. `[human-assist]` and `[human-verify]` criteria must remain unchecked until a human confirms them.
+**CRITICAL:** Never mark a criterion as `[x]` unless it was actually executed and returned a passing result (`passed: true`), OR it is a `[local-test]` criterion (which is attested by `/do-issue` during development). `[human-assist]` and `[human-verify]` criteria must remain unchecked until a human confirms them.
 
 ### If no linked issue:
 
@@ -741,10 +737,10 @@ Skip this step entirely — only post the PR comment from Step 8.
 After posting the PR comment, tell the user:
 1. Whether QA passed or failed
 2. Breakdown by environment and label type:
-   - **Local** (`[local-test]`): {passed}/{total}
    - **CI** (`[ci-check]`): {passed}/{total}
    - **Pre-merge checks** (`[subtask-check]`): {passed}/{total}
    - **Dev** (smoke tests + `[ai-verify]`): {passed}/{total}
+   - **Dev-phase** (`[local-test]`): {count} skipped (verified during development)
    - **`[human-assist]`:** {setup_succeeded}/{total} ready for human spot-check
    - **`[human-verify]`:** {count} pending human signoff
    - **`[post-merge]`:** {count} deferred to post-merge verification
