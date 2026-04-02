@@ -507,12 +507,6 @@ claude plugin install planning@super-werewolves-skills --scope user
 claude plugin install productivity@super-werewolves-skills --scope user
 ```
 
-After plugin installation, sync shared libs to canonical path:
-
-```bash
-bash ~/gitea-repos/development-skills/scripts/sync-libs.sh
-```
-
 Report status of each plugin.
 
 ### 4e. Install Sound Dependencies (if sound-notifications installed)
