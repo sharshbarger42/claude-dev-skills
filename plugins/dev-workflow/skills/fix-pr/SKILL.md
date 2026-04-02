@@ -14,7 +14,7 @@ Address all review comments on a Gitea pull request: fetch comments, classify by
 
 ## Session persistence
 
-!`cat $HOME/.config/development-skills/lib/session-state.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/session-state.md`
 
 At skill start, call **Session Read** to check for prior context. Then call **Session Write** after these milestones:
 - After Step 2 (PR metadata fetched — record PR title, branches)
@@ -31,19 +31,19 @@ Extract `owner`, `repo`, and PR `index` from the argument.
 
 ### Repo resolution
 
-!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/resolve-repo.md`
 
 ## Step 1b: Establish identity and register active work
 
-!`cat $HOME/.config/development-skills/lib/agent-identity.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/agent-identity.md`
 
 Derive your `AGENT_NAME` for this session.
 
-!`cat $HOME/.config/development-skills/lib/agent-coordination.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/agent-coordination.md`
 
 Register active work on this PR using the **Register Active Work** procedure from `agent-coordination.md`. Use the PR index as the issue index and the PR title as the issue title.
 
-!`cat $HOME/.config/development-skills/lib/discord-notify.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/discord-notify.md`
 
 Post a "Started Work" Discord notification for this PR.
 
@@ -164,7 +164,7 @@ For each comment, extract:
 
 ## Step 5: Read repo AGENTS.md
 
-!`cat $HOME/.config/development-skills/lib/fetch-agents-md.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/fetch-agents-md.md`
 
 ## Step 6: Present summary and confirm
 
@@ -200,7 +200,7 @@ Read the relevant files and process comments by disposition:
 4. **disposition: `questionable-benefit`** — Create a Gitea issue using `mcp__gitea__create_issue` with title `"[review][decision-needed] {brief description}"` and body explaining the trade-off and referencing the PR. Label with type `enhancement` and priority `low`. These issues are for human triage, not auto-pickup.
 5. **Explicit issue requests** — comments that say "create a ticket for X" or similar: use `mcp__gitea__create_issue`. Label with type and priority.
 
-!`cat $HOME/.config/development-skills/lib/label-issue.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/label-issue.md`
 
 Follow the repo's AGENTS.md coding standards when making changes.
 
@@ -208,7 +208,7 @@ Follow the repo's AGENTS.md coding standards when making changes.
 
 ### 9a: Run the quality gate
 
-!`cat $HOME/.config/development-skills/lib/quality-gate.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/quality-gate.md`
 
 Run the quality gate procedure on all files you changed in Step 8. Do NOT skip this step.
 
@@ -216,7 +216,7 @@ Run the quality gate procedure on all files you changed in Step 8. Do NOT skip t
 
 Include any files that the quality gate auto-formatted when staging.
 
-!`cat $HOME/.config/development-skills/lib/commit-push.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/commit-push.md`
 
 **Squashing review fixes into original commits:** Review fixes should not create new "address review" commits. Follow the Clean History Rules from `commit-push.md` above, with these fix-pr-specific additions:
 
@@ -247,9 +247,9 @@ After pushing, mark addressed comments as resolved on the PR:
 
 ## Step 10b: Update PR status label
 
-!`cat $HOME/.config/development-skills/lib/pr-status-labels.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/pr-status-labels.md`
 
-!`cat $HOME/.config/development-skills/lib/deploy-aware-label.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/deploy-aware-label.md`
 
 After resolving comments, update the PR's status label:
 

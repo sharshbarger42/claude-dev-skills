@@ -3,8 +3,8 @@
 Register, query, and deregister active work across agents. Uses Gitea labels as the authoritative signal, Agent Mail for richer context, and Discord for user-facing notifications.
 
 **Prerequisites:** Include these libs first:
-- `!cat $HOME/.config/development-skills/lib/agent-identity.md`
-- `!cat $HOME/.config/development-skills/lib/discord-notify.md`
+- `!cat ${CLAUDE_PLUGIN_ROOT}/lib/agent-identity.md`
+- `!cat ${CLAUDE_PLUGIN_ROOT}/lib/discord-notify.md`
 
 ## Multi-Agent Gate
 

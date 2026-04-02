@@ -18,7 +18,7 @@ Extract `owner`, `repo`, and PR `index` from the argument.
 
 ### Repo resolution
 
-!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/resolve-repo.md`
 
 ## Step 2: Fetch PR metadata
 
@@ -53,7 +53,7 @@ If the diff is larger than 100KB, note this and focus the review on the largest 
 
 ## Step 4: Extract review standards from AGENTS.md
 
-!`cat $HOME/.config/development-skills/lib/fetch-agents-md.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/fetch-agents-md.md`
 
 Then extract review-specific standards:
 1. Look for the `## Code Review Standards` heading in the file content.
@@ -88,7 +88,7 @@ You are reviewing a pull request. Perform four sequential review passes, "resett
 
 ## Review Checklists
 ```
-!`cat $HOME/.config/development-skills/lib/review-checklists.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/review-checklists.md`
 ```
 
 ## Instructions
@@ -199,9 +199,9 @@ Where `/tmp/review-payload.json` contains `{"body": "...", "event": "COMMENT", "
 
 ## Step 6b: Update PR status label
 
-!`cat $HOME/.config/development-skills/lib/pr-status-labels.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/pr-status-labels.md`
 
-!`cat $HOME/.config/development-skills/lib/deploy-aware-label.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/deploy-aware-label.md`
 
 After posting the review, update the PR's status label based on the computed verdict:
 

@@ -19,7 +19,7 @@ Extract `owner` and `repo` from the argument.
 
 ### Repo resolution
 
-!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/resolve-repo.md`
 
 ## Step 2: Fetch open issues
 

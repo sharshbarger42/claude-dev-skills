@@ -111,7 +111,7 @@ Do NOT modify `.gitignore` automatically — it creates unstaged changes that in
 
 ## Which skills should include this
 
-Add `!cat $HOME/.config/development-skills/lib/session-state.md` to:
+Add `!cat ${CLAUDE_PLUGIN_ROOT}/lib/session-state.md` to:
 - `do-issue` — long-running, multi-step implementation
 - `do-the-thing` — the longest skill, orchestrates multiple sub-skills
 - `fix-pr` — multi-step PR fixes

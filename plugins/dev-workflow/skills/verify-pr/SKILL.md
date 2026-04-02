@@ -21,7 +21,7 @@ Unlike `/review-pr` (which judges code quality), this skill checks **truthfulnes
 
 ### Repo resolution
 
-!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/resolve-repo.md`
 
 ### 1a. Fetch PR metadata
 

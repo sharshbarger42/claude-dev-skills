@@ -1,6 +1,6 @@
 # Planning Common Library
 
-Shared logic for planning skills. Include via `!cat $HOME/.config/development-skills/lib/planning-common.md`.
+Shared logic for planning skills. Include via `!cat ${CLAUDE_PLUGIN_ROOT}/lib/planning-common.md`.
 
 ## Plan storage
 

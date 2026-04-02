@@ -11,7 +11,7 @@ Deploy a PR or branch to the dev environment. Triggers the configured deploy wor
 
 ## Repo and Issue Resolution
 
-!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/resolve-repo.md`
 
 ## Step 1: Parse arguments
 

@@ -10,7 +10,7 @@ Full planning pipeline in one command: critically analyze an idea, create a deta
 
 **Input:** Optional idea description as the skill argument. If not provided, the first skill in the chain will gather it interactively.
 
-!`cat $HOME/.config/development-skills/lib/planning-common.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/planning-common.md`
 
 ## Step 1: Analyze the idea
 

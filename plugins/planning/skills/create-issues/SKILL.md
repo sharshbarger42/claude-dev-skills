@@ -18,11 +18,11 @@ Transform a project plan into a structured set of Gitea milestones, feature issu
 1. Issue reference (`repo#N`, `owner/repo#N`, or full URL) — **required**
 2. No second argument needed (repo is derived from the issue reference)
 
-!`cat $HOME/.config/development-skills/lib/planning-common.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/planning-common.md`
 
 ### Repo resolution
 
-!`cat $HOME/.config/development-skills/lib/resolve-repo.md`
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/resolve-repo.md`
 
 ## Mode Detection
 
