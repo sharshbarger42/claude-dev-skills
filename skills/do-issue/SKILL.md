@@ -415,6 +415,17 @@ This is the main work phase. Use your judgment to implement the issue based on:
 
 Read relevant files, write code, edit files. Do the actual implementation work here.
 
+### Writing tests
+
+If the implementation adds new functions, methods, or behavioral changes, write unit tests covering:
+- The happy path (expected inputs produce expected outputs)
+- Edge cases identified in the issue or discovered during implementation
+- Error handling paths
+
+Place tests in the repo's existing test directory following the established patterns. If no test directory exists, create one following the repo's conventions from AGENTS.md.
+
+Do NOT skip writing tests because "it's a small change." Every behavioral change needs test coverage.
+
 ## Step 7: Quality gate, commit, and push
 
 ### 7a: Run the quality gate
@@ -422,6 +433,20 @@ Read relevant files, write code, edit files. Do the actual implementation work h
 !`cat $HOME/.claude/development-skills/lib/quality-gate.md`
 
 Run the quality gate procedure on all files you changed in Step 6. Do NOT skip this step.
+
+### Unit tests are mandatory
+
+After formatting and linting, run the full test suite (not just new tests). Use the same language detection logic from the quality gate procedure above to determine the correct test command for the repo's stack:
+
+- **Python** (`pyproject.toml`): `uv run pytest tests/ -x -q`
+- **Node** (`package.json` with `test` script): `npm test`
+- **Go** (`go.mod`): `go test ./...`
+
+Run exactly one matching test command based on the project's primary stack — do not run all three speculatively.
+
+If any test fails — whether your new test or an existing one — fix it before committing. Do not push code with failing tests.
+
+New tests written in Step 6 must pass here. If they don't, fix the implementation, not the tests (unless the test itself has a bug).
 
 ### 7b: Commit and push
 
