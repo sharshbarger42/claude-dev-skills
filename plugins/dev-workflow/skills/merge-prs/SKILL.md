@@ -248,6 +248,7 @@ After each successful merge, check the deploy config for the repo:
 
 !`cat ${CLAUDE_PLUGIN_ROOT}/lib/discord-notify.md`
 
+<!-- Note: ~/.config/development-skills/ paths for user config (repos.md, discord-webhook, deploy-config.md) are intentional — these are per-machine user files, not plugin-internal libs. -->
 Read the webhook URL from `~/.config/development-skills/discord-webhook`. If the file doesn't exist, skip silently. Include the PR title, repo, PR number, and merge style in the notification. Use your agent name (derive it once at the start of the skill using the agent identity logic from `agent-identity.md`).
 
 ### Update local branch

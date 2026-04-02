@@ -36,6 +36,12 @@
       "description": "Session and workspace management — setup, status, session tracking.",
       "category": "skills",
       "source": "./plugins/productivity"
+    },
+    {
+      "name": "dev-workflow-hooks",
+      "description": "Injects development workflow context: project map, infrastructure reference, Gitea coordination reminders, and subagent coding rules.",
+      "category": "hooks",
+      "source": "./plugins/dev-workflow-hooks"
     }
   ]
 }
