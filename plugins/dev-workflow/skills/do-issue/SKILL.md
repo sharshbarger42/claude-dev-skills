@@ -380,6 +380,20 @@ Use `AskUserQuestion` to get the user's confirmation or refinement before writin
 
 ## Step 5: Set up workspace (worktree isolation)
 
+### Cross-repo detection
+
+If the target repo's local path (from the shorthand table) is different from the current working directory:
+
+1. The session cannot use `EnterWorktree` because it only creates worktrees in the current repo
+2. Instead, fall back to **in-place mode** in the target repo:
+   - `cd` to the target repo's local path
+   - `git fetch origin`
+   - Check for dirty working tree
+   - Create the branch directly
+3. Note: This means the main working tree of the target repo will be modified. The session's git context (AGENTS.md, memory) remains from the original repo.
+
+### Same-repo workspace setup
+
 Use worktree isolation so the main working tree stays clean:
 
 1. `cd` to the local repo path from the shorthand table. Verify the directory exists — if not, tell the user to clone the repo first and stop.
