@@ -194,6 +194,8 @@ Use `mcp__gitea-reviewer__create_pull_request_review` with:
 
 Do NOT use `REQUEST_CHANGES` — the agent recommends but never gates merges.
 
+**IMPORTANT:** This skill must NEVER merge the PR, even if risk is low. Approval is a recommendation — a human must decide to merge. Do not invoke `/merge-prs` or any merge action.
+
 ### Fallback if MCP is unavailable
 
 If the MCP tool is not available, fall back to curl:
