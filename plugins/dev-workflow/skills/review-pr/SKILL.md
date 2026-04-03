@@ -91,6 +91,28 @@ You are reviewing a pull request. Perform four sequential review passes, "resett
 !`cat ${CLAUDE_PLUGIN_ROOT}/lib/review-checklists.md`
 ```
 
+## Behavioral Rules
+
+Follow these rules strictly. Violating them produces false positives that waste the author's time.
+
+### Do not flag scope or cleanups
+- Documentation updates, refactors, and code cleanups included alongside a feature are WELCOME, not a problem. Do NOT flag them as "scope creep" or suggest they belong in a separate PR.
+- The ONLY time to flag scope is if a commit message references the wrong issue number (e.g., a commit for issue #50 in a PR for issue #42).
+
+### Validate before asserting
+- Do NOT make conditional claims like "if X is true then this is a problem." Instead, CHECK whether X is true using the information available (the diff, the PR body, the repo structure). If you cannot determine the answer, say "I could not verify whether X — worth checking" rather than asserting a problem exists.
+- Do NOT claim a version number is wrong without checking what the base branch actually has. The diff shows the change relative to the PR's base — trust it unless you have evidence otherwise.
+- Do NOT claim a path or pattern "doesn't work" or is "untested" without evidence. If the PR author uses a pattern, assume they tested it unless the code is demonstrably broken.
+
+### Do not assume things are untested
+- If you think a feature might not work in some edge case, research how the system handles it before flagging. Read the code, check the diff context, and look at related files.
+- Never say "this is untested" — you don't know what the author tested. Instead, flag specific scenarios that would fail based on the code logic.
+
+### Focus on real problems
+- Prioritize findings that would cause actual failures, security issues, or data loss.
+- Style preferences, theoretical concerns, and "what if someday" scenarios are nits at most.
+- If you're not confident a finding is real, downgrade it or skip it.
+
 ## Instructions
 
 Perform the four passes below in order. After each pass, mentally reset — approach the next pass as if seeing the diff fresh.
@@ -99,10 +121,10 @@ Perform the four passes below in order. After each pass, mentally reset — appr
 Review using the Pass 1 checklist. Focus on what could break or be exploited.
 
 ### Pass 2: Architecture & Design
-Review using the Pass 2 checklist. Focus on structure, patterns, and maintainability.
+Review using the Pass 2 checklist. Focus on structure, patterns, and maintainability. Remember: cleanups and documentation improvements are always welcome — do not flag them as scope issues.
 
 ### Pass 3: Standards Compliance
-Review using the Pass 3 checklist. Compare against the Review Standards above.
+Review using the Pass 3 checklist. Compare against the Review Standards above. Validate any assumptions about versions, paths, or patterns before asserting they are wrong.
 
 ### Pass 4: Edge Cases & Robustness
 Review using the Pass 4 checklist. Think about what happens at boundaries.
