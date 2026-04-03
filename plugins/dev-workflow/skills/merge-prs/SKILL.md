@@ -13,6 +13,9 @@ Find PRs that are ready to merge, verify all reviews are addressed and CI passes
 
 If no argument is provided, ask which repos to scan.
 
+**Flags:**
+- `--dry-run` — run analysis only (Steps 1-4); show which PRs are ready/not-ready and their merge strategy without merging, fixing CI, or deploying
+
 ## Session persistence
 
 !`cat ${CLAUDE_PLUGIN_ROOT}/lib/session-state.md`
@@ -92,6 +95,35 @@ For each PR marked `ready` from Step 3:
 3. If state is `failed`, mark the PR as `ci_failed` with the failing run name and workflow path
 4. If state is `running`, wait up to 5 minutes (poll every 30s via the procedure's polling mode), then re-check. If still not done, mark as `not mergeable (CI in progress)`
 5. If state is `no-ci`, treat CI as passed (repo has no CI configured)
+
+### Dry-run halt
+
+If `--dry-run` is set, stop here. Output a preview report and exit:
+
+```
+**DRY RUN — no changes will be made.**
+
+## PRs Ready to Merge
+
+| Repo | PR | Title | Commits | Reviews | CI | Merge Style |
+|------|----|-------|---------|---------|----|----|
+| {repo} | #{index} | {title} | {count} | {review_status} | {ci_status} | {rebase or squash} |
+
+## PRs Not Ready
+
+| Repo | PR | Title | Reason |
+|------|----|-------|--------|
+| {repo} | #{index} | {title} | {reason} |
+
+### What would happen next
+
+1. Attempt to fix {N} CI failures (if any)
+2. Confirm which ready PRs to merge
+3. Merge selected PRs (rebase for 1-commit, squash for multi-commit)
+4. Monitor deployments and run health checks
+```
+
+Do NOT fix CI failures, merge PRs, monitor deploys, or modify any labels. Return after printing the preview.
 
 ## Step 4b: Fix CI failures
 

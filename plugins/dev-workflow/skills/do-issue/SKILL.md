@@ -18,10 +18,11 @@ Implement a Gitea issue end-to-end: read the issue, write the code, create a PR,
 - `--skip-docs` — skip Step 11 (doc updates)
 - `--no-epic` — skip Step 2a (epic detection) to prevent recursive epic mode
 - `--child` — indicates invoked by a parent skill; suppresses QA offer (Step 13) and session persistence
+- `--dry-run` — run analysis only (Steps 1-4); show what would be done without creating branches, writing code, or creating PRs
 
 When override flags are present, parse them from the argument string after the issue reference. Example: `food-automation#110 --base-branch feature/99-big-feature --parent-index 99 --skip-docs --no-epic --child`
 
-**Flag validation:** Reject any unrecognized flags with an error — a misspelled `--no-epic` (e.g., `--no-epics`) could cause infinite recursive epic detection. Flag values (for `--base-branch` and `--parent-index`) must not start with `--`; if missing, halt with an error. `--parent-index` must be a positive integer. If `--base-branch` is present but `--parent-index` is absent, halt with an error.
+**Flag validation:** Reject any unrecognized flags with an error — a misspelled `--no-epic` (e.g., `--no-epics`) could cause infinite recursive epic detection. Recognized boolean flags: `--skip-docs`, `--no-epic`, `--child`, `--dry-run`. Flag values (for `--base-branch` and `--parent-index`) must not start with `--`; if missing, halt with an error. `--parent-index` must be a positive integer. If `--base-branch` is present but `--parent-index` is absent, halt with an error.
 
 ## Session persistence
 
@@ -377,6 +378,33 @@ Present the user with:
 - Any open questions or ambiguities
 
 Use `AskUserQuestion` to get the user's confirmation or refinement before writing any code. **Do NOT start coding until the user confirms.**
+
+### Dry-run halt
+
+If `--dry-run` is set, stop here. Output a preview report and exit:
+
+```
+**DRY RUN — no changes will be made.**
+
+**Issue:** #{index} — {title}
+**Repo:** {owner}/{repo}
+**Branch prefix:** {branch_prefix}
+**Proposed branch:** {branch_prefix}/{index}-{short-slug}
+
+### Approach
+
+{the confirmed approach from above}
+
+### What would happen next
+
+1. Create branch `{branch_prefix}/{index}-{short-slug}` from {default_branch}
+2. Implement the changes described above
+3. Run quality gate (format, lint, test)
+4. Create PR targeting {base_branch}
+5. Run /review-pr and triage comments
+```
+
+Do NOT create branches, write code, create PRs, or modify any labels. Return after printing the preview.
 
 ## Step 5: Set up workspace (worktree isolation)
 

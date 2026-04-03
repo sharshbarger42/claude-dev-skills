@@ -12,6 +12,9 @@ Address all review comments on a Gitea pull request: fetch comments, classify by
 - Owner/repo: `super-werewolves/food-automation#34`
 - Full URL: `https://git.home.superwerewolves.ninja/super-werewolves/food-automation/pulls/34`
 
+**Flags:**
+- `--dry-run` — run analysis only (Steps 1-6); show classified comments and fix plan without checking out code, implementing fixes, or pushing
+
 ## Session persistence
 
 !`cat ${CLAUDE_PLUGIN_ROOT}/lib/session-state.md`
@@ -177,6 +180,35 @@ Show the user a summary:
   - **Needs your call (→ decision issue)** — comments with disposition `questionable-benefit`, with the trade-off
 
 Use `AskUserQuestion` to get confirmation. **Do NOT start coding until the user confirms.**
+
+### Dry-run halt
+
+If `--dry-run` is set, stop here. Output a preview report and exit:
+
+```
+**DRY RUN — no changes will be made.**
+
+**PR:** #{index} — {title}
+**Repo:** {owner}/{repo}
+**Branch:** {head_branch}
+
+### Comment summary
+
+- **{X} will fix** — {brief list}
+- **{Y} non-issue** — {brief list with reasons}
+- **{Z} out of scope → issue** — {brief list}
+- **{N} needs your call → decision issue** — {brief list}
+
+### What would happen next
+
+1. Check out branch `{head_branch}`
+2. Implement {X} fixes
+3. Create Gitea issues for {Z} out-of-scope and {N} decision-needed items
+4. Run quality gate, commit, and force-push
+5. Dismiss addressed reviews and update PR labels
+```
+
+Do NOT check out code, implement fixes, create issues, push commits, or modify PR state. Return after printing the preview.
 
 ## Step 7: Set up workspace
 
