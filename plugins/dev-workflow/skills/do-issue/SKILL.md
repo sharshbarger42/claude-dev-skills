@@ -195,10 +195,29 @@ For each tier, run sub-tasks **as concurrently as possible** using the Agent too
    - Check which sub-tasks succeeded and which failed
    - **Verify reviews were posted:** For each successful sub-task PR, check that a code review comment exists on the PR (look for "## Code Review" in PR comments). If a sub-task agent skipped the review, run `/review-pr {repo_shorthand}#{pr_number}` yourself before merging.
    - For failed sub-tasks, record the error and continue with the next tier (don't block the whole run)
-   - Merge successful PRs into the integration branch via `mcp__gitea__pull_request_write` with `merge_style: "merge"` and `delete_branch: true`
+   - **Merge successful PRs via the Gitea API** — this is critical for proper audit trails:
+     ```
+     mcp__gitea__pull_request_write(
+         method="merge",
+         owner=owner,
+         repo=repo,
+         index=pr_number,
+         merge_style="rebase",
+         delete_branch=true,
+     )
+     ```
+     This marks PRs as "merged" in Gitea (not just "closed"), auto-closes linked issues, and keeps linear history.
+
+     **Fallback chain** if the API returns 405 (merge style not allowed):
+     1. `rebase` (preferred — linear history)
+     2. `squash` (acceptable — one commit per sub-task)
+     3. `fast-forward-only` (if branch has no divergence)
+
+     **NEVER use local `git merge`** to merge sub-task PRs into the integration branch. Local merges bypass Gitea entirely — PRs stay open, the "merged" audit trail is lost, and merge commits pollute the history. If all API merge styles fail, investigate and fix the root cause rather than falling back to local git.
 
 4. After all tiers complete, pull the integration branch to get all merged work:
    ```
+   git fetch origin
    git checkout feature/{parent_index}-{short-slug}
    git pull origin feature/{parent_index}-{short-slug}
    ```
