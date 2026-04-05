@@ -10,20 +10,13 @@ All repos use these `pr:` labels to track pull request workflow state in the Git
 | `pr: ready-to-merge` | Approved, verified (or no dev deploy), good to go | `/qa-pr` (when QA passes), `/review-pr` or `/fix-pr` (when approved, repo has no dev deploy) |
 | `pr: awaiting-prod-verification` | Merged, awaiting prod deploy health checks | `/merge-prs` (after merge, repo has prod deploy) |
 
-**Note:** For repos without a dev deploy config, skip `pr: awaiting-dev-verification` and set `pr: ready-to-merge` directly. See `deploy-aware-label.md` for the config-checking logic.
+### Setting PR status labels
 
-### Swapping PR status labels
+Use the `gitea-workflow` MCP server — it handles label ID lookups, old label removal, deploy-config awareness, and the swap in a single call:
 
-PR labels are applied to the PR's **issue index** (in Gitea, PRs are issues). The procedure is the same as issue status labels:
+- **After review:** `mcp__gitea-workflow__set_pr_label` with `verdict` = `"APPROVE"`, `"COMMENT"`, or `"REQUEST_CHANGES"`. The tool automatically picks the correct label based on the verdict and the repo's deploy config.
+- **Direct label set:** Pass a label key as `verdict`: `"needs-review"`, `"comments-pending"`, `"awaiting-dev-verification"`, `"ready-to-merge"`, `"awaiting-prod-verification"`.
+- **After review with post:** `mcp__gitea-workflow__post_review` posts the review AND sets the label in one call.
+- **After merge:** `mcp__gitea-workflow__merge_pr` merges AND sets the post-merge label.
 
-1. **Get the label ID by name:** Use `mcp__gitea__list_repo_labels` to look up label IDs by name. Cache the result per repo if processing multiple PRs.
-2. **Remove any existing `pr:` label:** Check the PR's current labels for any label whose name starts with `pr:`. Remove each one using `mcp__gitea__remove_issue_label` with the PR's index.
-3. **Add the new `pr:` label:** Use `mcp__gitea__add_issue_labels` with the PR's index and the target label ID.
-
-Always remove before adding to avoid a PR having two `pr:` labels simultaneously.
-
-If the target label doesn't exist in the repo, skip silently — don't error. The labels are informational and should not block the skill's main workflow.
-
-### Label creation
-
-Labels must exist in each repo before they can be applied. If `/list-prs` or any skill finds that `pr:` labels don't exist in a repo, it should note this in its output but not create them automatically. The user can create them manually or via a setup script.
+If the target label doesn't exist in the repo, the tool skips silently — labels are informational and should not block the skill's main workflow.

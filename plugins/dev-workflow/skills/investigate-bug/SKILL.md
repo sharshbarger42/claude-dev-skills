@@ -280,9 +280,7 @@ The final criterion must always be: `Human verification: {brief description of w
 
 ### Labeling procedure
 
-Create the issue with `mcp__gitea__create_issue`, then label it:
-
-!`cat ${CLAUDE_PLUGIN_ROOT}/lib/label-issue.md`
+Create the issue with `mcp__gitea__create_issue`, then label it using `mcp__gitea-workflow__label_issue` with the appropriate `type_label` (usually `"bug"`) and `priority` (`"high"`, `"medium"`, or `"low"`).
 
 ### Cross-referencing
 

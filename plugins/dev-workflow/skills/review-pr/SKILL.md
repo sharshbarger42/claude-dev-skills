@@ -195,44 +195,18 @@ Parse all findings that have a valid `path:LINE`. For each, build a comment obje
 - `body` — the full finding text including severity tag (e.g., `[warning] Missing resource limits on container.`)
 - `new_line_num` — the line number (integer)
 
-### Post via MCP
+### Post review and set label
 
-Use `mcp__gitea-reviewer__create_pull_request_review` with:
+Use `mcp__gitea-workflow__post_review` which posts the review as the `code-review-agent` service account AND sets the correct PR label in one call:
+
 - `owner`, `repo`, `index`
-- `state`: always `"COMMENT"` — the agent recommends but never gates merges
 - `body`: the formatted review body
-- `comments`: the inline comments array
+- `verdict`: the computed verdict (`"APPROVE"`, `"COMMENT"`, or `"REQUEST_CHANGES"`)
+- `comments`: the inline comments array (each with `path`, `body`, `new_line_num`)
 
-**Important:** Always post with `state: "COMMENT"` regardless of the computed verdict. The verdict is informational (shown in the review body), not a merge gate.
-
-If the MCP tool is not available (new session without restart), fall back to curl:
-
-```bash
-curl -s -X POST \
-  -H "Authorization: token $(cat $HOME/.config/code-review-agent/token)" \
-  -H "Content-Type: application/json" \
-  "https://git.home.superwerewolves.ninja/api/v1/repos/{owner}/{repo}/pulls/{index}/reviews" \
-  -d @/tmp/review-payload.json
-```
-
-Where `/tmp/review-payload.json` contains `{"body": "...", "event": "COMMENT", "comments": [...]}` with `new_position` (NOT `new_line_num`) for the REST API.
-
-**CRITICAL:** The Gitea REST API uses `new_position` for inline comment line numbers. The MCP tool uses `new_line_num`. These are different field names for the same concept — using the wrong one causes comments to silently collapse to position 0.
-
-## Step 6b: Update PR status label
-
-!`cat ${CLAUDE_PLUGIN_ROOT}/lib/pr-status-labels.md`
-
-!`cat ${CLAUDE_PLUGIN_ROOT}/lib/deploy-aware-label.md`
-
-After posting the review, update the PR's status label based on the computed verdict:
-
-- **Verdict has any `[critical]` or `[warning]` findings** → set `pr: comments-pending`
-- **Verdict `APPROVE`** (only nits or no findings) → check deploy config:
-  - Repo has dev deploy config → set `pr: awaiting-dev-verification`
-  - Repo has no dev deploy config → set `pr: ready-to-merge`
-
-Use the PR status label swap procedure from pr-status-labels.md.
+The tool automatically:
+- Posts the review with `state: "COMMENT"` (verdict is informational, not a merge gate)
+- Sets the PR label based on verdict and deploy config (`pr: comments-pending` for criticals/warnings, `pr: ready-to-merge` or `pr: awaiting-dev-verification` for approvals)
 
 ## Step 7: Report results
 

@@ -458,12 +458,7 @@ This context ensures sub-issues reference real file paths and follow existing pa
 
 The parent issue becomes the feature issue. Add the `feature` label to it:
 
-1. Call `mcp__gitea__list_repo_labels` to find the `feature` label ID
-2. If a `feature` label exists, add it with `mcp__gitea__add_issue_labels`
-3. If no `feature` label exists, create it with `mcp__gitea__create_label`:
-   - `name`: `feature`
-   - `color`: `#0075ca` (blue)
-   - Then add it to the issue
+Use `mcp__gitea-workflow__label_issue` with `type_label: "feature"` to add the label. If the label doesn't exist in the repo, create it first with `mcp__gitea__create_label` (name: `feature`, color: `#0075ca`), then retry.
 
 ## Step B5: Analyze and propose sub-issues
 

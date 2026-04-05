@@ -228,11 +228,9 @@ Read the relevant files and process comments by disposition:
 
 1. **disposition: `fix`** — Implement the change. This includes all user comments, all `[critical]` comments, all documentation comments, and any `[warning]`/`[nit]` comments evaluated as worth fixing.
 2. **disposition: `non-issue`** — Skip entirely. Do not fix, do not create an issue. The comment will appear in the report with the reason it was classified as a non-issue.
-3. **disposition: `complex-out-of-scope`** — Create a Gitea issue using `mcp__gitea__create_issue` with title `"[review] {brief description}"` and body referencing the PR and quoting the original comment. Label with type and priority — see labeling procedure below.
-4. **disposition: `questionable-benefit`** — Create a Gitea issue using `mcp__gitea__create_issue` with title `"[review][decision-needed] {brief description}"` and body explaining the trade-off and referencing the PR. Label with type `enhancement` and priority `low`. These issues are for human triage, not auto-pickup.
-5. **Explicit issue requests** — comments that say "create a ticket for X" or similar: use `mcp__gitea__create_issue`. Label with type and priority.
-
-!`cat ${CLAUDE_PLUGIN_ROOT}/lib/label-issue.md`
+3. **disposition: `complex-out-of-scope`** — Create a Gitea issue using `mcp__gitea__create_issue` with title `"[review] {brief description}"` and body referencing the PR and quoting the original comment. Label using `mcp__gitea-workflow__label_issue` with the appropriate `type_label` and `priority`.
+4. **disposition: `questionable-benefit`** — Create a Gitea issue using `mcp__gitea__create_issue` with title `"[review][decision-needed] {brief description}"` and body explaining the trade-off and referencing the PR. Label using `mcp__gitea-workflow__label_issue` with `type_label: "enhancement"` and `priority: "low"`. These issues are for human triage, not auto-pickup.
+5. **Explicit issue requests** — comments that say "create a ticket for X" or similar: use `mcp__gitea__create_issue`. Label using `mcp__gitea-workflow__label_issue`.
 
 Follow the repo's AGENTS.md coding standards when making changes.
 
@@ -279,18 +277,10 @@ After pushing, mark addressed comments as resolved on the PR:
 
 ## Step 10b: Update PR status label
 
-!`cat ${CLAUDE_PLUGIN_ROOT}/lib/pr-status-labels.md`
+After resolving comments, update the PR's status label using `mcp__gitea-workflow__set_pr_label`:
 
-!`cat ${CLAUDE_PLUGIN_ROOT}/lib/deploy-aware-label.md`
-
-After resolving comments, update the PR's status label:
-
-- **All `REQUEST_CHANGES` reviews dismissed** (every review comment was addressed) → check deploy config:
-  - Repo has dev deploy config → set `pr: awaiting-dev-verification`
-  - Repo has no dev deploy config → set `pr: ready-to-merge`
-- **Some `REQUEST_CHANGES` reviews remain** (comments were skipped or deferred) → set `pr: comments-pending`
-
-Use the PR status label swap procedure from pr-status-labels.md.
+- **All `REQUEST_CHANGES` reviews dismissed** (every review comment was addressed) → call with `verdict: "APPROVE"` (the tool picks `pr: ready-to-merge` or `pr: awaiting-dev-verification` based on deploy config)
+- **Some `REQUEST_CHANGES` reviews remain** (comments were skipped or deferred) → call with `verdict: "comments-pending"`
 
 ## Step 11: Report
 

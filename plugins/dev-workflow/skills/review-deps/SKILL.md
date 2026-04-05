@@ -176,54 +176,25 @@ Format as:
 {2-3 sentence overall assessment. Note any action items if risk is medium or high.}
 ```
 
-### Post the review via MCP
+### Post the review and set label
+
+Use `mcp__gitea-workflow__post_review` which posts the review AND sets the correct PR label in one call:
 
 **If overall risk is Low (no medium or high findings):**
-
-Use `mcp__gitea-reviewer__create_pull_request_review` with:
 - `owner`, `repo`, `index`
-- `state`: `"APPROVED"`
 - `body`: the formatted review body
+- `verdict`: `"APPROVE"`
+- `state`: `"APPROVED"` — marks the PR as approved in Gitea's review system
 
 **If overall risk is Medium or High:**
-
-Use `mcp__gitea-reviewer__create_pull_request_review` with:
 - `owner`, `repo`, `index`
-- `state`: `"COMMENT"`
 - `body`: the formatted review body
+- `verdict`: `"COMMENT"`
+- `state`: `"COMMENT"` (default)
 
-Do NOT use `REQUEST_CHANGES` — the agent recommends but never gates merges.
+The tool automatically sets the PR label based on the verdict and deploy config. Do NOT use `REQUEST_CHANGES` — the agent recommends but never gates merges.
 
-**IMPORTANT:** This skill must NEVER merge the PR, even if risk is low. Approval is a recommendation — a human must decide to merge. Do not invoke `/merge-prs` or any merge action.
-
-### Fallback if MCP is unavailable
-
-If the MCP tool is not available, fall back to curl:
-
-```bash
-curl -s -X POST \
-  -H "Authorization: token $(cat $HOME/.config/code-review-agent/token)" \
-  -H "Content-Type: application/json" \
-  "https://git.home.superwerewolves.ninja/api/v1/repos/{owner}/{repo}/pulls/{index}/reviews" \
-  -d @/tmp/review-payload.json
-```
-
-Where `/tmp/review-payload.json` contains `{"body": "...", "event": "APPROVE"}` or `{"body": "...", "event": "COMMENT"}`.
-
-## Step 8: Update PR status label
-
-!`cat ${CLAUDE_PLUGIN_ROOT}/lib/pr-status-labels.md`
-
-!`cat ${CLAUDE_PLUGIN_ROOT}/lib/deploy-aware-label.md`
-
-After posting the review, update the PR's status label:
-
-- **Overall risk Low (approved)** → check deploy config:
-  - Repo has dev deploy config → set `pr: awaiting-dev-verification`
-  - Repo has no dev deploy config → set `pr: ready-to-merge`
-- **Overall risk Medium or High (flagged)** → set `pr: comments-pending`
-
-Use the PR status label swap procedure from pr-status-labels.md.
+**IMPORTANT:** This skill must NEVER merge the PR, even if risk is low. Approval is a recommendation — a human must decide to merge.
 
 ## Step 9: Report to user
 

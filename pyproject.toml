@@ -1,0 +1,19 @@
+[project]
+name = "gitea-workflow-mcp"
+version = "0.1.0"
+description = "Gitea workflow MCP server with label-managed operations"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "mcp[cli]>=1.0",
+]
+
+[project.scripts]
+gitea-workflow-mcp = "gitea_workflow.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["gitea_workflow"]

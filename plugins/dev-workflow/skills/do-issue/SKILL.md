@@ -441,7 +441,7 @@ Use worktree isolation so the main working tree stays clean:
 3. `git checkout {default_branch} && git pull origin {default_branch}`
 4. Create the branch: `git checkout -b {branch_prefix}/{index}-{short-slug}`
 
-!`cat $HOME/.claude/development-skills/lib/status-labels.md`
+6. **Update status label:** Use `mcp__gitea-workflow__set_issue_status` with `status: "in-progress"` to mark the issue as actively being worked on.
 
 9. **Register active work:** After setting `status: in-progress`, register via Agent Mail and post a "Started Work" Discord notification using the procedures from `agent-coordination.md` and `discord-notify.md` (loaded in Step 1b). This is best-effort — if either fails, continue.
 
@@ -518,16 +518,12 @@ Use `mcp__gitea__pull_request_write` with method `create`:
 
 After creating the PR:
 
-1. **Update the issue status label:** replace `status: in-progress` with `status: in-review` on the issue (see status-labels.md above for the swap procedure).
-2. **Apply PR status label:** set `pr: needs-review` on the PR (see pr-status-labels.md for the swap procedure).
+1. **Update the issue status label:** `mcp__gitea-workflow__set_issue_status` with `status: "in-review"`
+2. **Apply PR status label:** `mcp__gitea-workflow__set_pr_label` with `verdict: "needs-review"`
 
-!`cat $HOME/.claude/development-skills/lib/pr-status-labels.md`
-
-**Fix mode note:** If `FIX_MODE = true`, the PR already exists — skip PR creation entirely. Instead, swap `status: in-progress` to `status: ready-to-test` on the issue, and set the PR label based on deploy config:
-- Repo has dev deploy config → set `pr: awaiting-dev-verification`
-- Repo has no dev deploy config → set `pr: ready-to-merge`
-
-!`cat $HOME/.claude/development-skills/lib/deploy-aware-label.md`
+**Fix mode note:** If `FIX_MODE = true`, the PR already exists — skip PR creation entirely. Instead:
+- `mcp__gitea-workflow__set_issue_status` with `status: "ready-to-test"`
+- `mcp__gitea-workflow__set_pr_label` with `verdict: "APPROVE"` (the tool picks the correct label based on deploy config)
 
 Then jump to Step 12.
 
@@ -565,7 +561,7 @@ Responding to review comments:
 
 **After posting the triage comment:**
 - For "fix now" items: implement the fixes, commit, and push to the same branch
-- For "separate issue" items: create the Gitea issue immediately using `mcp__gitea__create_issue`, link back to this PR. Then label it: call `mcp__gitea__list_repo_labels` to find label IDs, then `mcp__gitea__add_issue_labels`. Apply: a type label (`bug` if broken behavior/correctness problem, `enhancement` if improvement, `feature` if new capability) and a priority label (`priority: high`, `priority: medium`, or `priority: low` based on severity/impact). Skip silently if labels don't exist in the repo.
+- For "separate issue" items: create the Gitea issue immediately using `mcp__gitea__create_issue`, link back to this PR. Then label it using `mcp__gitea-workflow__label_issue` with the appropriate `type_label` (`bug`, `enhancement`, or `feature`) and `priority` (`high`, `medium`, or `low`).
 - For "won't fix" items: no action needed
 
 ## Step 11: Update documentation

@@ -268,13 +268,7 @@ Record the merge timestamp for each successfully merged PR.
 
 ### Apply post-merge label
 
-!`cat ${CLAUDE_PLUGIN_ROOT}/lib/pr-status-labels.md`
-
-!`cat ${CLAUDE_PLUGIN_ROOT}/lib/deploy-aware-label.md`
-
-After each successful merge, check the deploy config for the repo:
-- Repo **has** prod deploy config → set `pr: awaiting-prod-verification` on the PR
-- Repo has **no** prod deploy config → remove any remaining `pr:` label (PR is done)
+Use `mcp__gitea-workflow__merge_pr` instead of calling the Gitea merge API directly — it merges the PR AND applies the correct post-merge label based on deploy config (sets `pr: awaiting-prod-verification` for repos with prod deploy, removes PR labels for repos without).
 
 **Discord notification:** After each successful merge, post a "PR Merged" Discord notification using the green embed template:
 
@@ -367,9 +361,7 @@ Body: PR #{pr_index} ({pr_title}) was merged and the deploy workflow completed s
       Investigate and fix.
 ```
 
-Create with `mcp__gitea__create_issue`, then label it:
-
-!`cat ${CLAUDE_PLUGIN_ROOT}/lib/label-issue.md`
+Create with `mcp__gitea__create_issue`, then label it using `mcp__gitea-workflow__label_issue` with the appropriate `type_label` and `priority`.
 
 ### If deploy failed
 
@@ -384,7 +376,7 @@ Body: PR #{pr_index} ({pr_title}) was merged but the deploy workflow failed.
       Investigate and fix the deployment.
 ```
 
-Create with `mcp__gitea__create_issue`, then label as `bug` + `priority: high` (same procedure as above).
+Create with `mcp__gitea__create_issue`, then label using `mcp__gitea-workflow__label_issue` with `type_label: "bug"` and `priority: "high"`.
 
 ## Step 9.5: Verify `[post-merge]` criteria
 

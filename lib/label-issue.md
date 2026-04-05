@@ -1,9 +1,17 @@
 ### Labeling Issues
 
-When creating a Gitea issue, apply both a **type** label and a **priority** label:
+When creating a Gitea issue, apply both a **type** label and a **priority** label using one call:
 
-1. Call `mcp__gitea__list_repo_labels` to find label IDs for the repo
-2. **Type label** — pick one: `bug` (broken behavior, security vulnerability, correctness problem), `enhancement` (improvement to existing functionality), or `feature` (new capability)
-3. **Priority label** — pick one based on severity/impact: `priority: high` (blocks users or other work, service down, or data at risk), `priority: medium` (degraded functionality, normal queue), or `priority: low` (cosmetic, nice to have)
-4. Call `mcp__gitea__add_issue_labels` with the new issue index and both label IDs
-5. If any label doesn't exist in the repo, skip it silently
+```
+mcp__gitea-workflow__label_issue
+  owner: {owner}
+  repo: {repo}
+  index: {issue_index}
+  type_label: "bug" | "enhancement" | "feature"
+  priority: "high" | "medium" | "low"
+```
+
+- **Type label** — pick one: `bug` (broken behavior, security vulnerability, correctness problem), `enhancement` (improvement to existing functionality), or `feature` (new capability)
+- **Priority label** — pick one based on severity/impact: `high` (blocks users or other work, service down, or data at risk), `medium` (degraded functionality, normal queue), or `low` (cosmetic, nice to have)
+- If any label doesn't exist in the repo, it's skipped silently
+- Both parameters are optional — you can set just type or just priority

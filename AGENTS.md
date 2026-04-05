@@ -65,8 +65,8 @@ Skills include reusable markdown via `!\`cat ${CLAUDE_PLUGIN_ROOT}/lib/{name}.md
 | `resolve-repo.md` | Parse issue/PR references (shorthand, owner/repo#N, URL) |
 | `commit-push.md` | Commit formatting, testing, and push rules |
 | `quality-gate.md` | Lint, format, type-check, test before committing |
-| `pr-status-labels.md` | PR label swap procedures |
-| `deploy-aware-label.md` | Check if repo has dev/prod deploy config |
+| `pr-status-labels.md` | PR label definitions (use `gitea-workflow` MCP for operations) |
+| `deploy-aware-label.md` | Deploy-aware label docs (handled automatically by `gitea-workflow` MCP) |
 | `fetch-agents-md.md` | Read a repo's AGENTS.md for coding standards |
 | `review-checklists.md` | Four-pass code review checklists |
 | `agent-identity.md` | Derive agent name for multi-agent coordination |

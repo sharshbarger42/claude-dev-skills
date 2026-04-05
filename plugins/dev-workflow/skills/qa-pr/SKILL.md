@@ -634,15 +634,11 @@ The deploy workflow failed before smoke tests could run. Check the [workflow run
 
 ## Step 8.25: Update PR status label
 
-!`cat $HOME/.claude/development-skills/lib/pr-status-labels.md`
+After posting the PR comment, update the PR's status label using `mcp__gitea-workflow__set_pr_label`:
 
-After posting the PR comment, update the PR's status label:
-
-- **QA passed, no `[human-assist]` or `[human-verify]` criteria pending** → set `pr: ready-to-merge` (even if `[post-merge]` criteria exist — those are verified after merge by `/merge-prs`)
-- **QA passed, but `[human-assist]` or `[human-verify]` criteria pending** → keep `pr: awaiting-dev-verification` (human steps remaining)
-- **QA failed** → set `pr: comments-pending` (needs fixes before re-test)
-
-Use the PR status label swap procedure from pr-status-labels.md.
+- **QA passed, no `[human-assist]` or `[human-verify]` criteria pending** → call with `verdict: "APPROVE"` (the tool picks `pr: ready-to-merge` or `pr: awaiting-dev-verification` based on deploy config)
+- **QA passed, but `[human-assist]` or `[human-verify]` criteria pending** → keep `pr: awaiting-dev-verification` (human steps remaining — no label change needed)
+- **QA failed** → call with `verdict: "comments-pending"`
 
 ## Step 8.5: Post results on linked issue and update labels
 
