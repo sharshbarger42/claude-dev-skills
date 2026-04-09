@@ -38,6 +38,19 @@ plugins/
 4. **Bump the plugin version** in `plugins/{plugin-name}/.claude-plugin/plugin.json` — this is required for `claude plugins update` to detect the change.
 5. Commit, push, and create a PR.
 
+## Updating an existing plugin
+
+Any change to a plugin's contents (adding/removing/editing a skill, hook, script, or lib) **must** be accompanied by a version bump in that plugin's `.claude-plugin/plugin.json`. Without it, `claude plugins update` will not detect the change and users will stay on the cached old version.
+
+Semver guidance:
+- **Patch** (`1.4.0 → 1.4.1`): bug fix, typo, doc tweak, non-behavioral edit to an existing skill/hook.
+- **Minor** (`1.4.0 → 1.5.0`): new skill, new hook, new lib, or meaningful behavioral addition that is backward-compatible.
+- **Major** (`1.4.0 → 2.0.0`): removing a skill/hook, renaming a user-facing command, or a breaking change to hook behavior.
+
+**Moving a skill between plugins counts as a change to both plugins** — bump the version on the source plugin (minor, since it lost a skill) **and** the destination plugin (minor, since it gained one). Do this in the same PR as the move.
+
+Field order in `plugin.json` should be `name`, `description`, `version`, `author` to match the upstream `agent-sdk-dev` convention.
+
 ## Adding a new plugin
 
 1. Create the directory structure under `plugins/{plugin-name}/`.
