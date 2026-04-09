@@ -1,7 +1,7 @@
 {
   "name": "dev-workflow-hooks",
-  "version": "1.1.0",
   "description": "Injects development workflow context: project map, infrastructure reference, Gitea coordination reminders, and subagent coding rules.",
+  "version": "1.1.0",
   "author": {
     "name": "super-werewolves"
   }
