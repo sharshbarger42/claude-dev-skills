@@ -94,16 +94,26 @@ A read-only kubeconfig is needed to query the k3s dev cluster. Check if one exis
 Check whether a deploy workflow has already built a chart for the PR's head SHA:
 
 1. Use `mcp__gitea__actions_run_read` with `list_runs` to list workflow runs for the repo, filtering to the head branch
-2. Look for a run with ALL of:
+2. **If the API call fails** (403 permission error, network error, MCP error, or any non-success response): **stop immediately**. Report to the user:
+   > ❌ **QA aborted** — cannot access Actions API for `{owner}/{repo}`.
+   >
+   > Error: `{error message}`
+   >
+   > The QA skill requires Actions API access to deploy the PR branch to dev. Without it, QA cannot verify that the PR's code actually works when deployed. Running smoke tests against the existing deployment would only confirm the *previous* version is healthy — not that *this PR* works.
+   >
+   > To fix: check that the Gitea token used by the MCP server has `write:actions` scope for this repo.
+
+   Do NOT fall through to smoke tests. Do NOT post a "QA Passed" comment. The skill ends here.
+3. Look for a run with ALL of:
    - `head_sha` matching the PR's head SHA
    - `event: "workflow_dispatch"`
    - `conclusion: "success"`
    - `status: "completed"` (not waiting/running)
-3. If a matching run is found:
+4. If a matching run is found:
    - Extract `run_number` from the run
    - Compute the chart version using the pattern from deploy config: e.g., `0.1.0-dev.{run_number}`
    - Record: `chart_exists = true`, `chart_version`, `existing_run_number`, `existing_run_id`
-4. If no matching run is found:
+5. If no matching run is found:
    - Record: `chart_exists = false`
 
 ## Step 3.7: Check what's currently deployed on k3s dev
@@ -146,7 +156,7 @@ mcp__gitea__dispatch_repo_action_workflow
   inputs: { "environment": "dev" }
 ```
 
-If the dispatch fails, post a PR comment with the error and stop.
+If the dispatch fails (API error, 403, network failure, MCP error), **stop immediately**. Post a PR comment with the error and report to the user. Do NOT fall through to smoke tests — the code was never deployed.
 
 After dispatching, post a brief PR comment:
 ```
@@ -160,13 +170,14 @@ After dispatching, post a brief PR comment:
    - On the head branch (matching `head_sha` or `head_branch`)
    - With `event: "workflow_dispatch"`
    - Created after the dispatch timestamp
+   - **If the API call fails** (403, network error, MCP error): **stop immediately** with the same error message as Step 3.6. Do NOT fall through to smoke tests.
 3. If no run found yet, poll every 30 seconds for up to 5 minutes
 4. Once the run is found, poll its status every 30 seconds for up to 10 minutes:
    - `success` — proceed to Step 4c
-   - `failure` — jump to Step 8 (report failure)
+   - `failure` — **stop immediately**. Jump to Step 8 (report failure). Do NOT run smoke tests against the old deployment.
    - Still running — keep polling
 
-If no run is found after 5 minutes, jump to Step 8 with error: "Deploy workflow did not trigger within 5 minutes."
+If no run is found after 5 minutes, **stop immediately**. Jump to Step 8 with error: "Deploy workflow did not trigger within 5 minutes." Do NOT fall through to smoke tests.
 
 Record the run ID and conclusion for the report.
 
@@ -183,7 +194,7 @@ Flux CD picks up new Helm chart versions from the OCI registry. After a chart is
    - The health endpoint returns HTTP 200
    - The response indicates healthy status
 
-**Timeout behavior:** If the health endpoint doesn't return a healthy response within 15 minutes, proceed to Step 7 with a warning that Flux rollout may not have completed. The smoke tests will catch any remaining issues.
+**Timeout behavior:** If the health endpoint doesn't return a healthy response within 15 minutes, **stop immediately**. Report the timeout to the user — the deployment did not complete successfully. Do NOT run smoke tests against a potentially stale or unhealthy deployment.
 
 **Note:** Flux polls every 30 minutes, so this step may take a while. If the health endpoint was already healthy before the deploy (from a previous deployment), the smoke tests in Step 7 are the real validation — the health check here is just a gate to ensure the service is reachable.
 
