@@ -1,0 +1,73 @@
+name: Enforce Org Settings
+
+# Triggers:
+#   1. Weekly cron on Sunday at 09:00 UTC — full org scan + auto-fix
+#   2. Manual dispatch — optionally scoped to a single repo or dry-run
+#   3. Repository event (new repo created) — enforces on the new repo only
+
+on:
+  schedule:
+    - cron: "0 9 * * 0"  # Every Sunday at 09:00 UTC
+
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: "Single repo name to enforce (leave empty for all org repos)"
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry run — show what would change without making changes (true/false)"
+        required: false
+        default: "false"
+
+  # Fires when a new repository is created in the org.
+  # The enforcer is scoped to just the new repo via --repo.
+  repository:
+    types:
+      - created
+
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout development-skills
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install httpx
+
+      - name: Build enforcer arguments
+        id: args
+        run: |
+          ARGS=""
+
+          # Scope to the newly created repo when triggered by repository.created
+          if [ "${{ github.event_name }}" = "repository" ]; then
+            NEW_REPO="${{ github.event.repository.name }}"
+            echo "New repo created: ${NEW_REPO} — enforcing on it only"
+            ARGS="${ARGS} --repo ${NEW_REPO}"
+          fi
+
+          # workflow_dispatch overrides
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -n "${{ github.event.inputs.repo }}" ]; then
+              ARGS="${ARGS} --repo ${{ github.event.inputs.repo }}"
+            fi
+            if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+              ARGS="${ARGS} --dry-run"
+            fi
+          fi
+
+          echo "enforcer_args=${ARGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Run org settings enforcer
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          python scripts/enforce-org-settings.py ${{ steps.args.outputs.enforcer_args }}
