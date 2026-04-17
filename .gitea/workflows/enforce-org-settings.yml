@@ -20,8 +20,12 @@ on:
         required: false
         default: "false"
 
-  # Fires when a new repository is created in the org.
-  # The enforcer is scoped to just the new repo via --repo.
+  # NOTE: This trigger fires for events on the *development-skills* repo itself,
+  # not for new repo creation in the org. Gitea dispatches org-level repository
+  # events to org webhooks, not to workflow files in sibling repos. New repos are
+  # therefore caught on the next weekly Sunday scan (cron above).
+  # To enforce on new repos immediately, configure an org-level webhook that calls:
+  #   POST /api/v1/repos/super-werewolves/development-skills/actions/workflows/enforce-org-settings.yml/dispatches
   repository:
     types:
       - created

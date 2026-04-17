@@ -103,11 +103,15 @@ class OrgEnforcer:
 
     def enforce_repo(self, repo: dict, template_hook: str | None) -> RepoResult:
         result = RepoResult(name=repo["name"])
-        self._enforce_merge_policy(repo, result)
-        self._enforce_branch_protection(repo, result)
-        if template_hook is not None:
-            self._enforce_pre_receive_hook(repo, template_hook, result)
-        self._enforce_collaborator(repo, result)
+        try:
+            self._enforce_merge_policy(repo, result)
+            self._enforce_branch_protection(repo, result)
+            if template_hook is not None:
+                self._enforce_pre_receive_hook(repo, template_hook, result)
+            self._enforce_collaborator(repo, result)
+        except httpx.HTTPError as exc:
+            result.compliant = False
+            result.errors.append(f"Unexpected network error during enforcement: {exc}")
         if result.manual_needed:
             self._create_manual_issue(repo, result)
         return result
@@ -213,8 +217,12 @@ class OrgEnforcer:
                     f"[DRY-RUN] Would enable push restriction on {default_branch} (no direct pushes)"
                 )
             return
+        protection_id = existing.get("id")
+        if not protection_id:
+            result.errors.append("Branch protection record has no id — cannot patch")
+            return
         r = self.client.patch(
-            f"/repos/{ORG}/{repo['name']}/branch_protections/{existing['id']}",
+            f"/repos/{ORG}/{repo['name']}/branch_protections/{protection_id}",
             json=patches,
         )
         if r.status_code in (200, 201):
@@ -305,6 +313,7 @@ class OrgEnforcer:
                 # Can't determine — leave as-is
                 return
         elif resp.status_code != 404:
+            result.compliant = False
             result.errors.append(
                 f"Could not check collaborator status: HTTP {resp.status_code}"
             )
@@ -344,6 +353,20 @@ class OrgEnforcer:
             return
 
         title = "[repo-enforcer] Manual attention required for repo settings"
+
+        # Deduplication: skip if an open issue with this title already exists
+        search_resp = self.client.get(
+            f"/repos/{ORG}/{repo['name']}/issues",
+            params={"type": "issues", "state": "open", "q": "[repo-enforcer]"},
+        )
+        if search_resp.status_code == 200:
+            existing_issues = search_resp.json()
+            if any(i.get("title") == title for i in existing_issues):
+                print(
+                    f"  [SKIP] Open issue already exists for manual items in {repo['name']}"
+                )
+                return
+
         items = "\n".join(f"- {item}" for item in result.manual_needed)
         body = (
             "The org-settings enforcer detected items that require manual attention:\n\n"
@@ -427,8 +450,8 @@ def post_discord_summary(results: list[RepoResult], dry_run: bool) -> None:
             content=payload,
             headers={"Content-Type": "application/json"},
         )
-    except httpx.HTTPError:
-        pass  # Discord summary is best-effort
+    except httpx.HTTPError as exc:
+        print(f"[WARN] Discord post failed: {exc}")  # best-effort, don't fail the run
 
 
 # ------------------------------------------------------------------
