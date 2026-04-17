@@ -92,7 +92,8 @@ class OrgEnforcer:
                 f"/repos/{ORG}/{TEMPLATE_REPO}/git/hooks/pre-receive"
             )
             if resp.status_code == 200:
-                return resp.json().get("content", "")
+                content = resp.json().get("content", "")
+                return content if content else None
         except httpx.HTTPError as exc:
             print(f"  [WARN] Could not fetch template hook: {exc}")
         return None
@@ -357,7 +358,12 @@ class OrgEnforcer:
         # Deduplication: skip if an open issue with this title already exists
         search_resp = self.client.get(
             f"/repos/{ORG}/{repo['name']}/issues",
-            params={"type": "issues", "state": "open", "q": "[repo-enforcer]"},
+            params={
+                "type": "issues",
+                "state": "open",
+                "q": "[repo-enforcer]",
+                "limit": 50,
+            },
         )
         if search_resp.status_code == 200:
             existing_issues = search_resp.json()
@@ -393,12 +399,17 @@ class OrgEnforcer:
 
 
 def post_discord_summary(results: list[RepoResult], dry_run: bool) -> None:
-    webhook_file = os.path.expanduser("~/.config/development-skills/discord-webhook")
-    try:
-        with open(webhook_file) as fh:
-            webhook_url = fh.read().strip()
-    except FileNotFoundError:
-        return
+    # Prefer env var (works in Gitea Actions); fall back to local config file
+    webhook_url = os.environ.get("DISCORD_WEBHOOK_URL", "")
+    if not webhook_url:
+        webhook_file = os.path.expanduser(
+            "~/.config/development-skills/discord-webhook"
+        )
+        try:
+            with open(webhook_file) as fh:
+                webhook_url = fh.read().strip()
+        except FileNotFoundError:
+            return
     if not webhook_url:
         return
 
@@ -479,6 +490,11 @@ def main() -> None:
         help="Skip posting a summary to Discord.",
     )
     args = parser.parse_args()
+
+    if args.repo and "/" in args.repo:
+        parser.error(
+            f"--repo takes a bare repo name, not 'owner/repo' (got: {args.repo!r})"
+        )
 
     token = os.environ.get("GITEA_TOKEN", "")
     if not token:
