@@ -16,7 +16,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import subprocess
 import sys
 from dataclasses import dataclass, field
 
@@ -189,24 +188,46 @@ class OrgEnforcer:
                 )
             return
 
-        # Protection exists — make sure force push is disabled
+        # Protection exists — check force push and push restrictions
+        patches: dict[str, object] = {}
         if existing.get("enable_force_push", False):
-            result.compliant = False
-            if self.dry_run:
+            patches["enable_force_push"] = False
+        if not existing.get("enable_push", False):
+            # enable_push: false means direct pushes are unrestricted; lock it down
+            patches["enable_push"] = True
+            patches["enable_push_whitelist"] = True
+            patches["push_whitelist_usernames"] = []
+            patches["push_whitelist_teams"] = []
+
+        if not patches:
+            return
+
+        result.compliant = False
+        if self.dry_run:
+            if "enable_force_push" in patches:
                 result.fixed.append(
                     f"[DRY-RUN] Would disable force push on {default_branch}"
                 )
-                return
-            r = self.client.patch(
-                f"/repos/{ORG}/{repo['name']}/branch_protections/{existing['id']}",
-                json={"enable_force_push": False},
-            )
-            if r.status_code in (200, 201):
-                result.fixed.append(f"Disabled force push on {default_branch}")
-            else:
-                result.errors.append(
-                    f"Failed to disable force push: HTTP {r.status_code} — {r.text[:200]}"
+            if "enable_push" in patches:
+                result.fixed.append(
+                    f"[DRY-RUN] Would enable push restriction on {default_branch} (no direct pushes)"
                 )
+            return
+        r = self.client.patch(
+            f"/repos/{ORG}/{repo['name']}/branch_protections/{existing['id']}",
+            json=patches,
+        )
+        if r.status_code in (200, 201):
+            if "enable_force_push" in patches:
+                result.fixed.append(f"Disabled force push on {default_branch}")
+            if "enable_push" in patches:
+                result.fixed.append(
+                    f"Enabled push restriction on {default_branch} (no direct pushes)"
+                )
+        else:
+            result.errors.append(
+                f"Failed to patch branch protection: HTTP {r.status_code} — {r.text[:200]}"
+            )
 
     def _enforce_pre_receive_hook(
         self, repo: dict, template_hook: str, result: RepoResult
@@ -257,11 +278,31 @@ class OrgEnforcer:
             )
             if perm_resp.status_code == 200:
                 perm = perm_resp.json().get("permission", "")
-                # "read" is the minimum we want; anything higher is also acceptable
-                if perm in ("read", "write", "admin", "owner"):
+                if perm == COLLABORATOR_PERMISSION:
                     return
+                # Permission is higher than required — downgrade to read
+                result.compliant = False
+                if self.dry_run:
+                    result.fixed.append(
+                        f"[DRY-RUN] Would downgrade {COLLABORATOR_USER} from {perm} to {COLLABORATOR_PERMISSION}"
+                    )
+                    return
+                r = self.client.put(
+                    f"/repos/{ORG}/{repo['name']}/collaborators/{COLLABORATOR_USER}",
+                    json={"permission": COLLABORATOR_PERMISSION},
+                )
+                if r.status_code in (200, 201, 204):
+                    result.fixed.append(
+                        f"Downgraded {COLLABORATOR_USER} from {perm} to {COLLABORATOR_PERMISSION}"
+                    )
+                else:
+                    result.errors.append(
+                        f"Failed to downgrade {COLLABORATOR_USER}: "
+                        f"HTTP {r.status_code} — {r.text[:200]}"
+                    )
+                return
             else:
-                # Can't determine — leave as-is and note it
+                # Can't determine — leave as-is
                 return
         elif resp.status_code != 404:
             result.errors.append(
@@ -380,21 +421,14 @@ def post_discord_summary(results: list[RepoResult], dry_run: bool) -> None:
             ]
         }
     )
-    subprocess.run(
-        [
-            "curl",
-            "-s",
-            "-X",
-            "POST",
+    try:
+        httpx.post(
             webhook_url,
-            "-H",
-            "Content-Type: application/json",
-            "-d",
-            payload,
-        ],
-        capture_output=True,
-        check=False,
-    )
+            content=payload,
+            headers={"Content-Type": "application/json"},
+        )
+    except httpx.HTTPError:
+        pass  # Discord summary is best-effort
 
 
 # ------------------------------------------------------------------
@@ -432,39 +466,41 @@ def main() -> None:
         print("=== DRY RUN — no changes will be made ===\n")
 
     enforcer = OrgEnforcer(token=token, dry_run=args.dry_run)
+    try:
+        # Fetch template hook once
+        print(f"Fetching pre-receive hook from {ORG}/{TEMPLATE_REPO}…")
+        template_hook = enforcer.get_template_hook()
+        if template_hook is None:
+            print(
+                "  [WARN] Template hook unavailable — hook sync will be skipped for all repos."
+            )
 
-    # Fetch template hook once
-    print(f"Fetching pre-receive hook from {ORG}/{TEMPLATE_REPO}…")
-    template_hook = enforcer.get_template_hook()
-    if template_hook is None:
-        print(
-            "  [WARN] Template hook unavailable — hook sync will be skipped for all repos."
-        )
+        # Resolve repo list
+        if args.repo:
+            repos = [enforcer.get_repo(args.repo)]
+        else:
+            print(f"Fetching all repos in the {ORG} org…")
+            repos = enforcer.get_all_org_repos()
 
-    # Resolve repo list
-    if args.repo:
-        repos = [enforcer.get_repo(args.repo)]
-    else:
-        print(f"Fetching all repos in the {ORG} org…")
-        repos = enforcer.get_all_org_repos()
+        print(f"Found {len(repos)} repo(s) to check.\n")
 
-    print(f"Found {len(repos)} repo(s) to check.\n")
+        results: list[RepoResult] = []
+        for repo in repos:
+            name = repo["name"]
+            print(f"Checking {name}…")
+            result = enforcer.enforce_repo(repo, template_hook)
+            results.append(result)
 
-    results: list[RepoResult] = []
-    for repo in repos:
-        name = repo["name"]
-        print(f"Checking {name}…")
-        result = enforcer.enforce_repo(repo, template_hook)
-        results.append(result)
-
-        if result.compliant and not result.fixed:
-            print("  [OK] Compliant — no changes needed.")
-        for msg in result.fixed:
-            print(f"  [FIXED] {msg}")
-        for msg in result.manual_needed:
-            print(f"  [MANUAL] {msg}")
-        for msg in result.errors:
-            print(f"  [ERROR] {msg}")
+            if result.compliant and not result.fixed:
+                print("  [OK] Compliant — no changes needed.")
+            for msg in result.fixed:
+                print(f"  [FIXED] {msg}")
+            for msg in result.manual_needed:
+                print(f"  [MANUAL] {msg}")
+            for msg in result.errors:
+                print(f"  [ERROR] {msg}")
+    finally:
+        enforcer.client.close()
 
     # Print summary
     print("\n" + "=" * 60)

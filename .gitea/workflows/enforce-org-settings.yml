@@ -42,32 +42,30 @@ jobs:
       - name: Install dependencies
         run: pip install httpx
 
-      - name: Build enforcer arguments
-        id: args
-        run: |
-          ARGS=""
-
-          # Scope to the newly created repo when triggered by repository.created
-          if [ "${{ github.event_name }}" = "repository" ]; then
-            NEW_REPO="${{ github.event.repository.name }}"
-            echo "New repo created: ${NEW_REPO} — enforcing on it only"
-            ARGS="${ARGS} --repo ${NEW_REPO}"
-          fi
-
-          # workflow_dispatch overrides
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ -n "${{ github.event.inputs.repo }}" ]; then
-              ARGS="${ARGS} --repo ${{ github.event.inputs.repo }}"
-            fi
-            if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
-              ARGS="${ARGS} --dry-run"
-            fi
-          fi
-
-          echo "enforcer_args=${ARGS}" >> "$GITHUB_OUTPUT"
-
       - name: Run org settings enforcer
         env:
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          INPUT_REPO: ${{ github.event.inputs.repo }}
+          INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: |
-          python scripts/enforce-org-settings.py ${{ steps.args.outputs.enforcer_args }}
+          ARGS=()
+
+          # Scope to the newly created repo when triggered by repository.created
+          if [ "$EVENT_NAME" = "repository" ]; then
+            echo "New repo created: $REPO_NAME — enforcing on it only"
+            ARGS+=(--repo "$REPO_NAME")
+          fi
+
+          # workflow_dispatch overrides
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ -n "$INPUT_REPO" ]; then
+              ARGS+=(--repo "$INPUT_REPO")
+            fi
+            if [ "$INPUT_DRY_RUN" = "true" ]; then
+              ARGS+=(--dry-run)
+            fi
+          fi
+
+          python scripts/enforce-org-settings.py "${ARGS[@]}"
