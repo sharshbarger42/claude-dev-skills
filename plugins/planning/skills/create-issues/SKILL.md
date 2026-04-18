@@ -1,22 +1,17 @@
 ---
 name: create-issues
-description: Turn a project plan into Gitea milestones, vertically-sliced feature issues, and AI-ready sub-issues with dependency tracking. Can also break down an existing issue into sub-issues.
-args: "<plan-dir|issue-ref> [owner/repo]"
+description: "Turn a project plan into Gitea milestones, vertically-sliced feature issues, and AI-ready sub-issues with dependency tracking. (To decompose a single existing issue, use `create-subtasks` instead.)"
+args: "<plan-dir> [owner/repo]"
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, AskUserQuestion, Skill, mcp__gitea__issue_read, mcp__gitea__issue_write, mcp__gitea__list_issues, mcp__gitea__milestone_read, mcp__gitea__milestone_write, mcp__gitea__label_read, mcp__gitea__label_write, mcp__gitea__get_file_contents, mcp__gitea__get_dir_contents, mcp__gitea__create_repo, mcp__gitea__create_or_update_file, mcp__gitea-workflow__label_issue
 ---
 
 # Create Issues Skill
 
-Transform a project plan into a structured set of Gitea milestones, feature issues, and sub-issues ready for parallel AI execution. Can also decompose an existing Gitea issue into sub-issues.
+Transform a project plan into a structured set of Gitea milestones, feature issues, and sub-issues ready for parallel AI execution.
 
-**Input:** Two modes based on the first argument:
-
-**Mode A — From plan directory:**
+**Input:**
 1. Path to the plan directory (containing `plan.md` from `/plan-project`) — **required**
 2. Target `owner/repo` or shorthand — **optional** (will ask if not provided)
-
-**Mode B — From existing issue:**
-1. Issue reference (`repo#N`, `owner/repo#N`, or full URL) — **required**
-2. No second argument needed (repo is derived from the issue reference)
 
 !`cat ${CLAUDE_PLUGIN_ROOT}/lib/planning-common.md`
 
@@ -24,17 +19,19 @@ Transform a project plan into a structured set of Gitea milestones, feature issu
 
 !`cat ${CLAUDE_PLUGIN_ROOT}/lib/resolve-repo.md`
 
+## Shared issue body formats
+
+Issue body formats live in `plugins/planning/lib/issue-formats/` — one file per type (`feature.md`, `bug.md`, `chore.md`, `polish.md`, `contract.md`, `sub-issue.md`, `design.md`). This is the single source of truth shared across all planning skills (`create-issues`, `update-issue`, `create-subtasks`). When creating an issue, include the template for its type via `!cat ${CLAUDE_PLUGIN_ROOT}/lib/issue-formats/{type}.md` and fill in the placeholders. Never inline a template in a skill — always pull it from this directory so updates flow through all skills.
+
 ## Mode Detection
 
-Determine which mode to use based on the first argument:
+Inspect the first argument:
 
-- If the argument contains `#` or is a URL with `/issues/` → **Mode B** (existing issue)
-- If the argument is a file path or directory → **Mode A** (plan directory)
-- If ambiguous, ask the user
+- If the argument contains `#` or is a URL with `/issues/` → **this input is an issue reference.** Delegate to the `create-subtasks` skill via the `Skill` tool with the same issue reference as its argument. Stop here after invoking `create-subtasks` — do not continue with the plan-directory flow below.
+- If the argument is a file path or directory → continue with the plan-directory flow below.
+- If ambiguous, ask the user.
 
 ---
-
-# Mode A: From Plan Directory
 
 ## Step 1: Read the plan
 
@@ -157,168 +154,90 @@ CONTRACT: {name}
 
 ## Step 6: Create contract issues (if any)
 
-For each contract identified in Step 5, create a Gitea issue:
+For each contract identified in Step 5, create a Gitea issue.
 
-Use `mcp__gitea__create_issue`:
+Load the contract body template:
+
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/issue-formats/contract.md`
+
+Fill in every `{...}` placeholder with the specifics from Step 5 (type, name, dependent issue list, must-define bullets, deliverable location). List the dependent features in `## Dependent Issues` so the `update-milestone` skill can later audit contract wiring.
+
+Use `mcp__gitea__issue_write` method `create`:
 - `title`: `contract: {name} — define {type}`
-- `body`:
-```markdown
-## Contract Definition
-
-**Type:** {API spec / data schema / event format / interface definition}
-
-**Context:**
-This contract is needed because the following features depend on a shared {type}:
-{list of dependent features with brief descriptions}
-
-**Must define:**
-- {specific thing the contract must specify}
-- {validation rules, error formats, versioning}
-
-**Acceptance criteria:**
-- [ ] Contract is documented in {location — e.g., docs/contracts/, OpenAPI spec, protobuf}
-- [ ] Contract is reviewed and approved
-- [ ] Contract includes versioning strategy
-- [ ] Example request/response or usage is provided
-
-**IMPORTANT:** This contract MUST be completed and merged before any dependent issues can begin work. Dependent issues are tagged with `depends-on: #{this_issue_number}`.
-```
+- `body`: filled-in template above
 - `milestone`: assign to the earliest milestone that contains a dependent feature
-- `labels`: add `contract`, `priority: high` (contracts block other work), and `feature`
+- `labels`: apply `contract` via `mcp__gitea-workflow__label_issue` with `type_label: "contract"` and `priority: "high"` (contracts block other work). If the `contract` label doesn't exist in the repo, create it first with `mcp__gitea__label_write` method `create`.
 
-Store the created issue numbers — these will be referenced as blockers.
+Store the created issue numbers — these will be referenced as blockers on dependent feature issues.
 
-## Step 7: Create feature issues
+## Step 7: Create feature / bug / chore / polish / design issues
 
-For each feature in each phase/milestone, create a vertically-sliced feature issue.
+For each item in each phase/milestone, classify it and create the right kind of issue. The plan may contain more than just new features — bug-fix items, refactors, dep upgrades, visual polish, and design/research spikes all belong in their own issue type rather than being shoehorned into a feature.
 
-**Vertical slicing rules:**
-- Each feature issue must deliver a user-visible enhancement
-- A user should be able to see/use something new after this feature is complete
-- No "set up database" or "create models" issues — those are sub-issues
-- Frame everything from the user's perspective: "User can {do thing}" not "Implement {technical thing}"
+**Classification heuristics (derive from plan content):**
 
-Use `mcp__gitea__create_issue`:
-- `title`: `feat: {user-facing description}` (e.g., `feat: user can import recipes from URL`)
-- `body`:
-```markdown
-## Description
+| Plan item looks like… | Type | Title prefix |
+|-----------------------|------|--------------|
+| New user-visible capability | `feature` | `feat:` |
+| Improvement to existing user-facing functionality | `enhancement` | `enhance:` |
+| Broken behavior that needs fixing | `bug` | `fix:` |
+| Internal refactor, dep upgrade, infra/tooling, no user-visible change | `chore` | `chore:` |
+| Visual/copy/styling tweak, no logic change | `polish` | `polish:` |
+| Spike / RFC / research / library evaluation / architecture decision — deliverable is a decision or doc, not shipped code (e.g., "pick a vector DB", "can we use WebRTC?", "RFC: new auth flow") | `design` | `design:` / `spike:` / `RFC:` |
 
-{What the user can do after this feature is implemented — 2-3 sentences from their perspective}
+**Vertical slicing rules for features / enhancements:**
+- Each feature issue must deliver a user-visible change.
+- A user should be able to see/use something new after this feature is complete.
+- No "set up database" or "create models" feature issues — those are sub-issues.
+- Frame from the user's perspective: "User can {do thing}" not "Implement {technical thing}".
 
-## Context from plan
+Chore and polish issues are allowed to be small and scoped — they don't need to be user-visible (chore) or deliver new capability (polish). Bug issues center on a concrete reproduction.
 
-{Relevant architecture decisions, tech stack details, and design notes from plan.md}
+**Design issues** capture spikes, RFCs, research, library/tool evaluations, and architecture decisions — anything whose deliverable is a decision, RFC, ADR, prototype report, or research summary rather than shipped code. Signals: plan item frames a question ("which X should we use?", "can we do Y?"), lists options to choose between, or calls for a prototype/evaluation. Design issues typically **precede** their dependent feature issues — if a feature depends on the outcome of a design, mark the feature as `Depends on #{design_issue}` in its `## Dependencies` section. This is softer than a contract dependency: a design doesn't require re-escalation if changed (it's a decision, not an interface), but dependent features should wait for the decision to land before starting. A design issue often produces a `contract` issue as one of its outputs, but not always.
 
-## Scope
+### Body templates (by type)
 
-**In scope:**
-- {specific deliverable}
-- {specific deliverable}
+Load the template for each issue's type and fill in placeholders:
 
-**Out of scope:**
-- {what this does NOT include — reference later milestone features}
+- **feature / enhancement** — !`cat ${CLAUDE_PLUGIN_ROOT}/lib/issue-formats/feature.md`
+- **bug** — !`cat ${CLAUDE_PLUGIN_ROOT}/lib/issue-formats/bug.md`
+- **chore** — !`cat ${CLAUDE_PLUGIN_ROOT}/lib/issue-formats/chore.md`
+- **polish** — !`cat ${CLAUDE_PLUGIN_ROOT}/lib/issue-formats/polish.md`
+- **design** — !`cat ${CLAUDE_PLUGIN_ROOT}/lib/issue-formats/design.md`
 
-## Technical notes
+For each issue, pull the matching template, replace every `{...}` placeholder with content grounded in `plan.md` / `analysis.md` and the target repo's actual architecture. Never invent file paths or library choices — cite what the plan says.
 
-- {relevant architecture decision from plan}
-- {library to use and why}
-- {data model or API endpoint involved}
-
-## Dependencies
-
-{If this feature depends on a contract issue:}
-- **BLOCKED BY** #{contract_issue_number} — `contract: {name}`. **Do not begin work until the contract is merged.** When implementing, follow the contract exactly as specified. If the contract is unclear or seems wrong, **stop work and escalate to a human** — do not improvise a different interface.
-
-{If this feature depends on another feature:}
-- Depends on #{other_issue_number} — {why}
-
-## Test Criteria
-
-- [ ] [ai-verify] {testable criterion from user perspective — verifiable via API on dev}
-- [ ] [ai-verify] {testable criterion — verifiable via API on dev}
-- [ ] [local-test] Lint and type-check pass
-- [ ] [local-test] Unit/integration tests pass
-- [ ] [ci-check] CI pipeline passes
-- [ ] [subtask-check] All sub-issues are closed
-- [ ] [post-merge] {any prod-only verification — health check, DNS, Flux reconciliation, etc.}
-
-**Label guide for test criteria:**
-- `[ai-verify]` — AI tests this live against the dev API
-- `[local-test]` — runnable locally (lint, tests, build, type-check)
-- `[ci-check]` — verify CI/CD passed
-- `[subtask-check]` — all sub-issues and blockers completed
-- `[human-verify]` — requires human judgment (visual, UX, feel)
-- `[human-assist]` — AI sets up environment, human spot-checks
-- `[post-merge]` — can only be verified after merge to main (prod checks)
-```
-- `milestone`: the milestone ID for this phase
-- `labels`: type label (`feature`, `enhancement`, or `bug`), plus a priority label (`priority: high`, `priority: medium`, or `priority: low` — based on milestone urgency and user impact)
+Use `mcp__gitea__issue_write` method `create` for each:
+- `title`: `{prefix}: {short description}` (per table above)
+- `body`: filled-in template above
+- `milestone`: the milestone ID for this phase (for design issues, assign to the earliest milestone that contains a dependent feature — the decision must land before the feature work starts)
+- `labels`: apply via `mcp__gitea-workflow__label_issue` with `type_label` set to `feature`, `enhancement`, `bug`, `chore`, `polish`, or `design`, plus a `priority` (`high` / `medium` / `low`) based on milestone urgency and user impact. If a label doesn't exist in the repo, create it first with `mcp__gitea__label_write` method `create`.
 
 Store created issue numbers for sub-issue references.
 
 ## Step 8: Create sub-issues
 
-For each feature issue, break it down into sub-issues that are small enough for an AI agent to complete in a single session (via `/do-issue`).
+For each feature issue, break it down into sub-issues that are small enough for an AI agent to complete in a single session (via `/do-issue`). For a deeper breakdown of an existing issue — especially one with contract references — prefer the dedicated `/create-subtasks` skill; this step performs the same work inline during the plan-to-issues flow.
 
 **Sub-issue sizing rules:**
-- Each sub-issue should touch 1-3 files maximum
-- Each should be completable in roughly 30-60 minutes of focused work
-- Each should be independently testable
-- Parallel-safe: two agents should be able to work on different sub-issues simultaneously without merge conflicts (different files or clearly separated code sections)
+- Scoped to exactly ONE code area (`backend`, `frontend`, `data-model`, `api-contract`, `infra/ci`, `tests`, `docs`). If work spans multiple areas, split into multiple sub-issues.
+- Touches 1-3 files maximum.
+- Completable in roughly 30-60 minutes of focused work.
+- Independently testable.
+- Parallel-safe: two agents working on different sub-issues should never edit the same file.
 
-**Sub-issue types:**
-- `implementation` — write new code
-- `test` — write tests for existing code
-- `config` — CI/CD, deployment, configuration
-- `docs` — documentation updates
+Load the sub-issue body template:
 
-Use `mcp__gitea__create_issue`:
+!`cat ${CLAUDE_PLUGIN_ROOT}/lib/issue-formats/sub-issue.md`
+
+Fill in every placeholder — especially the `## Contract` section (inputs/outputs with producers/consumers) and, if the parent is blocked by a contract, the `## Contract compliance` section pointing at that contract issue.
+
+Use `mcp__gitea__issue_write` method `create`:
 - `title`: `sub: {specific task}` (e.g., `sub: add recipe URL parser with validation`)
-- `body`:
-```markdown
-## Parent
-
-Sub-issue of #{parent_feature_issue_number} — {parent title}
-
-## Task
-
-{Clear, specific description of exactly what to implement — 3-5 sentences}
-
-## Files to create/modify
-
-- `{file_path}` — {what to do in this file}
-- `{file_path}` — {what to do in this file}
-
-## Technical details
-
-- {specific implementation approach}
-- {library/function to use}
-- {data model or schema reference}
-
-## Contract compliance
-
-{If the parent depends on a contract:}
-- **MUST follow contract defined in** #{contract_issue_number}
-- Specifically: {which part of the contract applies to this sub-issue}
-- **If the contract doesn't exist yet or seems wrong, STOP WORK and escalate to a human.** Do not guess or create your own interface.
-
-## Dependencies
-
-{If this sub-issue must be done after another sub-issue:}
-- Depends on #{other_sub_issue} — {why, what it provides}
-
-{If this sub-issue can be done in parallel:}
-- No blockers — can be started immediately
-
-## Test Criteria
-
-- [ ] [ai-verify] {specific, testable criterion — verifiable via API on dev}
-- [ ] [local-test] All existing tests still pass
-- [ ] [ci-check] CI pipeline passes
-```
+- `body`: filled-in sub-issue template above
 - `milestone`: same milestone as the parent feature
-- `labels`: `sub-issue`, `{sub-issue type}` (NO priority label — sub-issues inherit priority from their parent feature)
+- `labels`: apply `sub-issue` via `mcp__gitea-workflow__label_issue` with `type_label: "sub-issue"`. Also add a code-area label (e.g., `backend`, `frontend`) via `mcp__gitea__issue_write` method `add_labels` — create the label first with `mcp__gitea__label_write` method `create` if it doesn't exist in the repo. NO priority label — sub-issues inherit priority from their parent feature.
+- If the parent is blocked by a contract, also add the `blocked` label so the sub-issue inherits the block.
 
 ## Step 9: Add dependency labels
 
@@ -419,180 +338,4 @@ Report to the user:
 - #{N} {title} ← waiting on #{contract_issue}
 
 **Issue map saved to:** {plan_dir}/issues-created.md
-```
-
----
-
-# Mode B: Break Down Existing Issue
-
-Use this mode when given an issue reference (e.g., `multi-agent-system#235` or `food-automation#42`). Reads the issue, understands its scope, and creates sub-issues for it.
-
-## Step B1: Parse the issue reference
-
-Extract `owner`, `repo`, and issue `index` from the argument using the repo resolution logic above.
-
-## Step B2: Fetch issue metadata
-
-Use `mcp__gitea__issue_read` (or `get_issue_by_index`) with the parsed `owner`, `repo`, and `index` to get:
-- Issue title
-- Issue body/description
-- Labels
-- Milestone
-- Comments (for additional context)
-
-If the issue is not found, report the error and stop.
-
-Also fetch `AGENTS.md` from the repo's default branch for coding standards context.
-
-## Step B3: Read the codebase for context
-
-To create accurate sub-issues, understand what already exists:
-
-1. Read the repo's directory structure (use `mcp__gitea__get_dir_contents` or local `ls`)
-2. If the issue references specific files, APIs, or components, read those files
-3. Identify the architectural patterns in use (file naming, module structure, test patterns)
-
-This context ensures sub-issues reference real file paths and follow existing patterns.
-
-## Step B4: Add `feature` label to parent issue
-
-The parent issue becomes the feature issue. Add the `feature` label to it:
-
-Use `mcp__gitea-workflow__label_issue` with `type_label: "feature"` to add the label. If the label doesn't exist in the repo, create it first with `mcp__gitea__create_label` (name: `feature`, color: `#0075ca`), then retry.
-
-## Step B5: Analyze and propose sub-issues
-
-Break the issue down into sub-issues following the same sizing rules as Mode A Step 8:
-
-- Each sub-issue should touch 1-3 files maximum
-- Each should be completable in roughly 30-60 minutes of focused work
-- Each should be independently testable
-- Parallel-safe where possible
-
-Analyze the issue body for:
-- Distinct deliverables or checklist items
-- Separable components (backend vs frontend, model vs API vs UI)
-- Natural ordering (schema first, then API, then UI)
-- Test tasks that can run in parallel with implementation
-
-Present the proposed breakdown to the user with `AskUserQuestion`:
-
-```
-## Breaking down #{index}: {title}
-
-I'll create {N} sub-issues:
-
-| # | Sub-issue | Files | Depends on | Status |
-|---|-----------|-------|------------|--------|
-| 1 | {task description} | {file1}, {file2} | — | ✅ ready |
-| 2 | {task description} | {file3} | — | ✅ ready |
-| 3 | {task description} | {file4}, {file5} | #1 | 🔒 after #1 |
-| 4 | {task description (tests)} | {test_file} | #1, #2 | 🔒 after #1, #2 |
-
-### Parallel work opportunities
-- Sub-issues 1 and 2 can be worked on simultaneously
-- Sub-issue 3 must wait for #1
-- Sub-issue 4 (tests) can start after #1 and #2
-
-Proceed with creating these sub-issues?
-```
-
-Options:
-- **Yes, create all** (Recommended)
-- **Adjust breakdown** (free text — add, remove, or modify sub-issues)
-
-## Step B6: Create sub-issues
-
-For each confirmed sub-issue, create a Gitea issue:
-
-Use `mcp__gitea__issue_write` with `method: "create"`:
-- `title`: `sub: {specific task}` (e.g., `sub: create TypeScript types matching backend models`)
-- `body`:
-```markdown
-## Parent
-
-Sub-issue of #{parent_issue_number} — {parent title}
-
-## Task
-
-{Clear, specific description of exactly what to implement — 3-5 sentences}
-
-## Files to create/modify
-
-- `{file_path}` — {what to do in this file}
-- `{file_path}` — {what to do in this file}
-
-## Technical details
-
-- {specific implementation approach from codebase analysis}
-- {library/function to use}
-- {existing patterns to follow — reference actual files in the repo}
-
-## Dependencies
-
-{If this sub-issue must be done after another sub-issue:}
-- Depends on #{other_sub_issue} — {why, what it provides}
-
-{If this sub-issue can be done in parallel:}
-- No blockers — can be started immediately
-
-## Acceptance criteria
-
-- [ ] {specific, testable criterion}
-- [ ] {specific, testable criterion}
-- [ ] All existing tests still pass
-```
-- `milestone`: same milestone as the parent issue (if it has one)
-- `labels`: `sub-issue` plus the sub-issue type (`implementation`, `test`, `config`, or `docs`)
-
-## Step B7: Update parent issue
-
-After creating all sub-issues, update the parent issue body to include a task list linking to all sub-issues:
-
-Use `mcp__gitea__issue_write` with `method: "add_comment"` to add a comment (do NOT overwrite the original body):
-
-```markdown
-## Sub-issues
-
-This feature has been broken down into the following sub-issues:
-
-- [ ] #{N} — {sub-issue title}
-- [ ] #{N} — {sub-issue title}
-- [ ] #{N} — {sub-issue title}
-- [ ] #{N} — {sub-issue title}
-
-### Parallel work opportunities
-- {which sub-issues can be done simultaneously}
-- {which must be sequential and why}
-
-### Suggested order
-1. #{N} — {title} (no dependencies, start here)
-2. #{N} — {title} (no dependencies, parallel with #1)
-3. #{N} — {title} (after #1)
-4. #{N} — {title} (after #1 and #2)
-```
-
-## Step B8: Report
-
-Report to the user:
-
-```
-## Issue Breakdown Complete
-
-**Parent:** #{parent_index} — {parent_title}
-**Repo:** {owner}/{repo}
-**Sub-issues created:** {count}
-**Label added:** `feature` on #{parent_index}
-
-### Sub-issues
-
-| # | Title | Depends on | Status |
-|---|-------|------------|--------|
-| #{N} | {title} | — | ✅ ready |
-| #{N} | {title} | — | ✅ ready |
-| #{N} | {title} | #{N} | 🔒 blocked |
-
-### Ready to start
-> `/do-issue {repo}#{first_ready_sub}` — {title}
-> `/do-issue {repo}#{next_ready_sub}` — {title}
 ```
