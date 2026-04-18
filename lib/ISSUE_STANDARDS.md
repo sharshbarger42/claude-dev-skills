@@ -33,6 +33,7 @@ Issues fall into one of four tiers. Pick the right tier before writing the title
 | Bug | `fix: {what is broken}` | `fix: login fails with trailing whitespace` |
 | Enhancement | `enhance: {what improves}` | `enhance: recipe list loads 3x faster` |
 | Sub-issue | `sub: {specific task}` | `sub: add recipe URL parser with validation` |
+| Design | `design: {decision being made}` or `spike:` / `RFC:` | `design: pick a vector DB for recipe embeddings` |
 
 Rules:
 - Frame features from the user's perspective — "User can X", not "Implement X".
@@ -216,13 +217,18 @@ Every issue gets a **type** label and (for feature/bug/enhancement) a **priority
 
 ### Type (applied via `label_issue`)
 
-The `mcp__gitea-workflow__label_issue` tool only accepts these three values for `type_label`:
+The `mcp__gitea-workflow__label_issue` tool accepts these values for `type_label`:
 
 | Label | When |
 |-------|------|
 | `bug` | Broken behavior, security vulnerability, correctness problem |
 | `enhancement` | Improvement to existing functionality |
-| `feature` | New capability |
+| `feature` | New user-visible capability |
+| `chore` | Internal refactor, dep upgrade, infra work — no user-visible change |
+| `polish` | Visual/copy/styling tweak — no behavior change |
+| `contract` | Cross-cutting interface/schema/API/event-format definition that blocks dependents |
+| `sub-issue` | AI-sized implementation task scoped to a single code area |
+| `design` | Spike, RFC, research, library evaluation, or architecture decision — deliverable is a decision or doc, not shipped code |
 
 ### Priority
 
@@ -232,9 +238,9 @@ The `mcp__gitea-workflow__label_issue` tool only accepts these three values for 
 | `priority: medium` | Degraded functionality, normal queue |
 | `priority: low` | Cosmetic, nice-to-have |
 
-### Tier markers (informational)
+### Tier markers
 
-`contract` and `sub-issue` are **not** part of the `label_issue` taxonomy — `label_issue` will reject them. Apply them via the generic `mcp__gitea__issue_write` (`add_labels`) if the repo defines them. The tier is also obvious from the title prefix (`contract:` / `sub:`), so these labels are mainly an aid for filtering in the Gitea UI.
+`contract` and `sub-issue` are now first-class type labels accepted by `label_issue`. The tier is also obvious from the title prefix (`contract:` / `sub:`), so these labels double as a filtering aid in the Gitea UI.
 
 | Label | When |
 |-------|------|
@@ -298,7 +304,7 @@ Sub-issues must be:
 
 ## Checklist Before Creating
 
-- [ ] Title uses the correct prefix (`feat:`, `fix:`, `sub:`, `contract:`, `enhance:`)
+- [ ] Title uses the correct prefix (`feat:`, `fix:`, `sub:`, `contract:`, `enhance:`, `design:` / `spike:` / `RFC:`)
 - [ ] Body follows the tier's template
 - [ ] Acceptance Criteria uses GIVEN/WHEN/THEN where behavior is testable
 - [ ] Test Criteria checkboxes are tagged (`[ai-verify]`, `[local-test]`, etc.)

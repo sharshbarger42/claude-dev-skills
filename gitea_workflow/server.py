@@ -103,7 +103,7 @@ def set_issue_status(owner: str, repo: str, index: int, status: str) -> str:
         repo: Repository name
         index: Issue index number
         status: Target status — one of "backlog", "in-progress", "ready-to-test",
-                "in-review", "done"
+                "in-review", "done", "needs-human-review"
     """
     if status not in STATUS_LABELS:
         return f"Invalid status '{status}'. Valid: {', '.join(sorted(STATUS_LABELS))}"
@@ -126,7 +126,8 @@ def label_issue(
         owner: Repository owner
         repo: Repository name
         index: Issue index number
-        type_label: Issue type — one of "bug", "enhancement", "feature"
+        type_label: Issue type — one of "bug", "enhancement", "feature",
+                    "chore", "polish", "contract", "sub-issue", "design"
         priority: Priority level — one of "high", "medium", "low"
     """
     labels_to_add = []

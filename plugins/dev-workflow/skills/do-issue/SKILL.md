@@ -580,7 +580,7 @@ Responding to review comments:
 
 **After posting the triage comment:**
 - For "fix now" items: implement the fixes, commit, and push to the same branch
-- For "separate issue" items: create the Gitea issue immediately using `mcp__gitea__create_issue`, link back to this PR. Then label it using `mcp__gitea-workflow__label_issue` with the appropriate `type_label` (`bug`, `enhancement`, or `feature`) and `priority` (`high`, `medium`, or `low`).
+- For "separate issue" items: create the Gitea issue immediately using `mcp__gitea__create_issue`, link back to this PR. Then label it using `mcp__gitea-workflow__label_issue` with the appropriate `type_label` (`bug`, `enhancement`, `feature`, `chore`, `polish`, `contract`, `sub-issue`, or `design`) and `priority` (`high`, `medium`, or `low`).
 - For "won't fix" items: no action needed
 
 ## Step 11: Update documentation

@@ -20,12 +20,22 @@ STATUS_LABELS = {
     "ready-to-test": "status: ready-to-test",
     "in-review": "status: in-review",
     "done": "status: done",
+    "needs-human-review": "status: needs-human-review",
 }
 
 STATUS_LABEL_PREFIX = "status: "
 
 # Issue type labels
-TYPE_LABELS = {"bug", "enhancement", "feature"}
+TYPE_LABELS = {
+    "bug",
+    "enhancement",
+    "feature",
+    "chore",
+    "polish",
+    "contract",
+    "sub-issue",
+    "design",
+}
 
 # Issue priority labels
 PRIORITY_LABELS = {"priority: high", "priority: medium", "priority: low"}
