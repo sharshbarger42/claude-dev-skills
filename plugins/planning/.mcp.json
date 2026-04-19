@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "gitea-workflow": {
+      "command": "gitea-workflow-mcp",
+      "env": {
+        "GITEA_URL": "${GITEA_URL}",
+        "GITEA_TOKEN": "${GITEA_TOKEN}"
+      }
+    }
+  }
+}
