@@ -156,6 +156,47 @@ AskUserQuestion:
 
    If the array already contains other entries, append `"gitea"` without removing them.
 
+5. **Install the `gitea-workflow-mcp` binary.** This is a separate Python MCP server (in the `development-skills` repo) that provides higher-level workflow tools (`set_pr_label`, `post_review`, `label_issue`, `set_issue_status`, etc.) used by `dev-workflow` and `planning` skills. The plugins ship `.mcp.json` declarations that auto-register the server with Claude Code, but the binary itself must be on PATH.
+
+   Check if already installed:
+
+   ```bash
+   command -v gitea-workflow-mcp
+   ```
+
+   If not found, install editable from the development-skills checkout:
+
+   ```bash
+   uv tool install --editable ~/gitea-repos/development-skills 2>/dev/null \
+     || pip install -e ~/gitea-repos/development-skills
+   ```
+
+   If `~/gitea-repos/development-skills` doesn't exist yet, warn the user that this step will be retried on the next `setup-env` run after the repo is cloned, and continue.
+
+6. **Export `GITEA_URL` and `GITEA_TOKEN` to the user's shell profile.** The plugin-shipped `gitea-workflow` MCP declarations reference these env vars at MCP launch via `${VAR}` template references — they must be present in the shell environment that launches Claude Code.
+
+   Detect the shell config file:
+
+   ```bash
+   case "$SHELL" in
+     */zsh) SHELL_RC="$HOME/.zshrc" ;;
+     *)     SHELL_RC="$HOME/.bashrc" ;;
+   esac
+   ```
+
+   Idempotent insert — only append if not already present:
+
+   ```bash
+   grep -q "^export GITEA_URL=" "$SHELL_RC" 2>/dev/null \
+     || echo "export GITEA_URL='{gitea_url}'" >> "$SHELL_RC"
+   grep -q "^export GITEA_TOKEN=" "$SHELL_RC" 2>/dev/null \
+     || echo "export GITEA_TOKEN='{token}'" >> "$SHELL_RC"
+   ```
+
+   Note: shell rc files are usually `chmod 644`. The token is now in plain text in `$SHELL_RC` — if the host has untrusted local users, run `chmod 600 "$SHELL_RC"` to restrict access.
+
+   Tell the user to `source $SHELL_RC` or open a new terminal so the next `claude` invocation inherits the vars.
+
 ### 2e. Multi-Agent Mode
 
 ```
