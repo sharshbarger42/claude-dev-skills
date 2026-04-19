@@ -27,14 +27,28 @@ mcp = FastMCP("gitea-workflow")
 
 def _get_env(name: str, default: str | None = None) -> str:
     val = os.environ.get(name, default)
-    if val is None:
+    if val is None or val == "":
         print(f"Error: {name} environment variable is required", file=sys.stderr)
         sys.exit(1)
     return val
 
 
+def _validate_base_url(base_url: str) -> str:
+    """Return base_url if valid, otherwise exit with a clear error."""
+    if not base_url.startswith(("http://", "https://")):
+        print(
+            f"Error: GITEA_URL must start with 'http://' or 'https://' "
+            f"(got: {base_url!r}). Check the MCP server launch config — "
+            f"if set to '${{GITEA_URL}}', ensure Claude Code is expanding "
+            f"the env var before launching the server.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return base_url
+
+
 def _init_client() -> GiteaClient:
-    base_url = _get_env("GITEA_URL")
+    base_url = _validate_base_url(_get_env("GITEA_URL"))
     token = _get_env("GITEA_TOKEN")
 
     # Optional reviewer token for posting reviews as a service account
@@ -290,6 +304,58 @@ def dismiss_review(
     label_result = client.swap_pr_label(owner, repo, index, target_label)
 
     return f"Review {review_id} dismissed. {label_result}"
+
+
+@mcp.tool()
+def list_milestone_issues(
+    owner: str,
+    repo: str,
+    milestone: int,
+    state: str = "open",
+    page: int = 1,
+    per_page: int = 30,
+) -> list[dict]:
+    """List issues belonging to a specific milestone.
+
+    Wraps the Gitea issues endpoint with a milestone filter. Excludes PRs.
+    Returns an empty list for a non-existent milestone.
+
+    Args:
+        owner: Repository owner
+        repo: Repository name
+        milestone: Milestone ID (integer)
+        state: Issue state — "open", "closed", or "all" (default: "open")
+        page: Page number (default: 1)
+        per_page: Results per page, max 50 (default: 30)
+    """
+    valid_states = {"open", "closed", "all"}
+    if state not in valid_states:
+        return [
+            {
+                "error": f"Invalid state '{state}'. Valid: {', '.join(sorted(valid_states))}"
+            }
+        ]
+
+    client = _get_client()
+    issues = client.list_milestone_issues(
+        owner, repo, milestone, state=state, page=page, per_page=per_page
+    )
+
+    # Trim to the fields callers actually need
+    trimmed = []
+    for issue in issues:
+        body = issue.get("body") or ""
+        trimmed.append(
+            {
+                "number": issue.get("number"),
+                "title": issue.get("title"),
+                "state": issue.get("state"),
+                "labels": [lbl.get("name") for lbl in issue.get("labels") or []],
+                "body": body[:500] + ("…" if len(body) > 500 else ""),
+                "html_url": issue.get("html_url"),
+            }
+        )
+    return trimmed
 
 
 def main():
