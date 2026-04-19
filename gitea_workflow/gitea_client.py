@@ -214,6 +214,37 @@ class GiteaClient:
             return resp.json()
         return {"status": "merged"}
 
+    def list_milestone_issues(
+        self,
+        owner: str,
+        repo: str,
+        milestone: int,
+        state: str = "open",
+        page: int = 1,
+        per_page: int = 30,
+    ) -> list[dict]:
+        """List issues belonging to a specific milestone.
+
+        Wraps `GET /repos/{owner}/{repo}/issues` with the `milestones`
+        filter and `type=issues` (excludes PRs).
+
+        Returns an empty list if the milestone has no matching issues
+        or does not exist.
+        """
+        url = f"{self.api_url}/repos/{owner}/{repo}/issues"
+        params = {
+            "milestones": str(milestone),
+            "state": state,
+            "type": "issues",
+            "page": str(page),
+            "limit": str(per_page),
+        }
+        resp = self._client.get(url, params=params)
+        if resp.status_code == 404:
+            return []
+        resp.raise_for_status()
+        return resp.json()
+
     def dismiss_review(
         self,
         owner: str,
