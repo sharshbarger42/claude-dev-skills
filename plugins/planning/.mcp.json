@@ -1,7 +1,12 @@
 {
   "mcpServers": {
     "gitea-workflow": {
-      "command": "gitea-workflow-mcp",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+ssh://gitea@192.168.0.174:2222/super-werewolves/development-skills.git@main",
+        "gitea-workflow-mcp"
+      ],
       "env": {
         "GITEA_URL": "${GITEA_URL}",
         "GITEA_TOKEN": "${GITEA_TOKEN}"
