@@ -6,4 +6,4 @@ on:
 
 jobs:
   check-commits:
-    uses: selina/gitea-deploy-actions/.gitea/workflows/check-commits-reusable.yml@main
+    uses: http://gitea.int.superwerewolves.ninja:3000/super-werewolves/gitea-deploy-actions/.gitea/workflows/check-commits-reusable.yml@main
