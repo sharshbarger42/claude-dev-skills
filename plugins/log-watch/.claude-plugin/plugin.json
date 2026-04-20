@@ -1,0 +1,8 @@
+{
+  "name": "log-watch",
+  "description": "Tail K3s Loki, journald, and file-based logs. Route warnings, errors, and debug events to severity-specific handler skills.",
+  "version": "0.1.0",
+  "author": {
+    "name": "super-werewolves"
+  }
+}

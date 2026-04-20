@@ -42,6 +42,12 @@
       "description": "Injects development workflow context: project map, infrastructure reference, Gitea coordination reminders, and subagent coding rules.",
       "category": "hooks",
       "source": "./plugins/dev-workflow-hooks"
+    },
+    {
+      "name": "log-watch",
+      "description": "Tail K3s Loki, journald, and file-based logs. Route warnings, errors, and debug events to severity-specific handler skills.",
+      "category": "skills",
+      "source": "./plugins/log-watch"
     }
   ]
 }
