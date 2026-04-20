@@ -325,16 +325,18 @@ def list_milestone_issues(
         repo: Repository name
         milestone: Milestone ID (integer)
         state: Issue state — "open", "closed", or "all" (default: "open")
-        page: Page number (default: 1)
-        per_page: Results per page, max 50 (default: 30)
+        page: Page number, must be >= 1 (default: 1)
+        per_page: Results per page, 1-50 (default: 30)
     """
     valid_states = {"open", "closed", "all"}
     if state not in valid_states:
-        return [
-            {
-                "error": f"Invalid state '{state}'. Valid: {', '.join(sorted(valid_states))}"
-            }
-        ]
+        raise ValueError(
+            f"Invalid state '{state}'. Valid: {', '.join(sorted(valid_states))}"
+        )
+    if page < 1:
+        raise ValueError(f"page must be >= 1 (got {page})")
+    if not 1 <= per_page <= 50:
+        raise ValueError(f"per_page must be between 1 and 50 (got {per_page})")
 
     client = _get_client()
     issues = client.list_milestone_issues(

@@ -79,3 +79,11 @@ def test_list_milestone_issues_raises_on_http_error():
     client = _make_client(handler)
     with pytest.raises(httpx.HTTPStatusError):
         client.list_milestone_issues("owner", "repo", milestone=1)
+
+
+def test_list_milestone_issues_returns_empty_on_404():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"message": "milestone not found"})
+
+    client = _make_client(handler)
+    assert client.list_milestone_issues("owner", "repo", milestone=9999) == []

@@ -240,6 +240,10 @@ class GiteaClient:
             "limit": per_page,
         }
         resp = self._client.get(url, params=params)
+        # A non-existent milestone ID can surface as 404 depending on server
+        # version. Normalise to an empty list so the documented contract holds.
+        if resp.status_code == 404:
+            return []
         resp.raise_for_status()
         return resp.json()
 
