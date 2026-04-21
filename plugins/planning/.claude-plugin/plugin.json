@@ -1,7 +1,7 @@
 {
   "name": "planning",
   "description": "Planning pipeline — analyze ideas, create project plans, generate Gitea issues.",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "author": {
     "name": "super-werewolves"
   }

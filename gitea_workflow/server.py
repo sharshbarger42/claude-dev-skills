@@ -1,8 +1,17 @@
-"""Gitea Workflow MCP server — high-level workflow tools with label management."""
+"""Gitea Workflow MCP server — high-level workflow tools with label management.
+
+Transport defaults to ``streamable-http`` on port 8319 so multiple Claude
+sessions can share one server instance.  Override with env vars:
+
+    MCP_TRANSPORT   stdio | streamable-http (default: streamable-http)
+    MCP_HOST        bind address (default: 127.0.0.1)
+    MCP_PORT        listen port  (default: 8319)
+"""
 
 from __future__ import annotations
 
 import os
+import socket
 import sys
 from pathlib import Path
 
@@ -365,8 +374,38 @@ def list_milestone_issues(
     return trimmed
 
 
+DEFAULT_PORT = 8319
+
+
+def _port_in_use(host: str, port: int) -> bool:
+    """Return True if *host*:*port* is already bound."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(1)
+        return s.connect_ex((host, port)) == 0
+
+
 def main():
-    mcp.run(transport="stdio")
+    transport = os.environ.get("MCP_TRANSPORT", "streamable-http")
+    if transport == "streamable-http":
+        try:
+            port = int(os.environ.get("MCP_PORT", str(DEFAULT_PORT)))
+        except ValueError:
+            print(
+                f"error: MCP_PORT must be a number, got {os.environ['MCP_PORT']!r}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        host = os.environ.get("MCP_HOST", "127.0.0.1")
+        if _port_in_use(host, port):
+            print(
+                f"gitea-workflow-mcp: {host}:{port} already in use — "
+                "assuming another instance is running.",
+                file=sys.stderr,
+            )
+            sys.exit(0)
+        mcp.settings.host = host
+        mcp.settings.port = port
+    mcp.run(transport=transport)
 
 
 if __name__ == "__main__":

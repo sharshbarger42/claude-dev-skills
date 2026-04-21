@@ -126,11 +126,28 @@ Skills include shared logic via `!cat $HOME/.claude/development-skills/lib/{name
 | `review-checklists.md` | Code review checklist patterns |
 | `planning-common.md` | Plan storage and information gathering |
 
+## Gitea Workflow MCP Server
+
+The `gitea-workflow-mcp` server provides PR label management, review posting,
+and merge tools.  It runs as an HTTP service (port 8319) so all Claude sessions
+share one instance.
+
+```bash
+# Start the server (requires GITEA_URL and GITEA_TOKEN in env)
+gitea-workflow-mcp                     # HTTP on 127.0.0.1:8319 (default)
+MCP_TRANSPORT=stdio gitea-workflow-mcp # stdio mode (single-session)
+```
+
+The server must be running before Claude sessions connect.  On flywheel it is
+managed via systemd user service — see `homelab-setup` for the Ansible playbook.
+
+Env vars: `MCP_TRANSPORT`, `MCP_HOST`, `MCP_PORT`, `GITEA_URL`, `GITEA_TOKEN`.
+
 ## Secrets
 
 Secrets are never committed. They're read at runtime:
 
-- **Gitea API token**: `~/.mcp.json` (passed to gitea-mcp via args)
+- **Gitea API token**: env var `GITEA_TOKEN` (for gitea-workflow-mcp) and `~/.mcp.json` (for gitea-mcp)
 - **code-review-agent token**: `$HOME/.config/code-review-agent/token`
 - **Discord webhook**: `~/.config/development-skills/discord-webhook`
 
