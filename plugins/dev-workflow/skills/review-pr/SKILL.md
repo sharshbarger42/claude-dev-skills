@@ -20,23 +20,34 @@ Extract `owner`, `repo`, and PR `index` from the argument.
 
 !`cat ${CLAUDE_PLUGIN_ROOT}/lib/resolve-repo.md`
 
-## Step 2: Fetch PR metadata
+## Step 2: Gather full PR context
 
-Use `mcp__gitea__get_pull_request_by_index` with the parsed `owner`, `repo`, and `index` to get:
+Always fetch live state from Gitea — never rely on cached or in-conversation data from earlier in the session.
+
+Fetch all of the following in parallel:
+
+1. **PR metadata** — Use `mcp__gitea__pull_request_read(method="get")` to get title, body, base/head branches, default branch, and current HEAD SHA.
+2. **PR labels** — From the PR metadata response (labels array).
+3. **PR comments** — Use `mcp__gitea__issue_read(method="get_comments")` to get all issue-level comments (discussion, directives from the author, prior context).
+4. **PR reviews** — Use `mcp__gitea__pull_request_read(method="get_reviews")` to get all existing reviews (for staleness check and to understand prior feedback).
+5. **Linked issue** (if referenced) — If the PR title or body references an issue (e.g., `#123`, `fixes #45`), use `mcp__gitea__issue_read(method="get")` to fetch the issue body for requirements context.
+
+From the PR metadata, extract:
 - PR title
 - PR body/description
 - Base and head branches
 - Default branch (`base.repo.default_branch`)
+- Current HEAD SHA
+- Labels
 
 If the PR is not found, report the error and stop.
 
 ## Step 2b: Check for existing reviews on current HEAD
 
-Before fetching the diff and running a new review, check if the PR already has a non-stale review covering the current HEAD:
+Before fetching the diff and running a new review, check the reviews already fetched in Step 2:
 
-1. Use `mcp__gitea__list_pull_request_reviews` to get all reviews.
-2. Check each review's `stale` field. A review is **not stale** if the PR branch has not changed since it was submitted.
-3. If a non-stale review from `code-review-agent` exists, the current code has already been reviewed. Report this to the user:
+1. From the reviews list (already fetched), check each review's `stale` field. A review is **not stale** if the PR branch has not changed since it was submitted.
+2. If a non-stale review from `code-review-agent` exists, the current code has already been reviewed. Report this to the user:
 
 ```
 PR #N already has a review from code-review-agent covering the current HEAD ({sha}).
@@ -79,6 +90,12 @@ You are reviewing a pull request. Perform four sequential review passes, "resett
 
 ## PR: {title}
 {pr_body}
+
+## Linked Issue
+{issue_body_or_"No linked issue found."}
+
+## PR Comments & Prior Discussion
+{pr_comments_summary_or_"No comments."}
 
 ## Review Standards
 {review_standards}
