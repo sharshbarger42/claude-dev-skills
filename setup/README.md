@@ -53,8 +53,7 @@ human's side is:
 
 - **One prompt per phase**, not one big monolith. Composable beats clever.
 - **Pure copy-paste content** in prompt files — no human-facing framing inside the prompt
-  body. Framing goes in this README or in a separate explanation block above the
-  `--- BEGIN PROMPT ---` marker.
+  body. Framing goes in this README, not the prompt file itself.
 - **Default everything that can be defaulted** (hostname for peer name, well-known DNS
   endpoints, etc.) and only ask the human to override. Never re-ask for values you can
   read from the system.

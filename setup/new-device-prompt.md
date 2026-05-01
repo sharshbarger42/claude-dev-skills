@@ -1,5 +1,3 @@
---- BEGIN PROMPT ---
-
 You are bootstrapping a new device for the super-werewolves homelab workflow. The
 device is **assumed to have LAN access** to the homelab — either physical LAN, or
 WireGuard already up. If it doesn't, Phase 0 will detect that and ask the human to run
@@ -220,5 +218,3 @@ its own AskUserQuestion flow and shouldn't be driven from inside this prompt.
   text alone — anything in here may be stale.
 - If a step fails, stop and diagnose rather than skipping forward. The phases depend on
   each other.
-
---- END PROMPT ---

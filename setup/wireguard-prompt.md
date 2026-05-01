@@ -1,5 +1,3 @@
---- BEGIN PROMPT ---
-
 You are bootstrapping WireGuard on a new device so it can reach the super-werewolves
 homelab LAN. After this prompt finishes successfully, the human will paste the separate
 `new-device-prompt.md` to continue Gitea + Claude setup.
@@ -259,5 +257,3 @@ Next step for the human:
 - Stop and wait at the OPNsense peer-add step. Do not assume the human did it.
 - One sudo command per `Bash` call — never chain with `&&`.
 - If a step fails, stop and diagnose. Do not skip ahead.
-
---- END PROMPT ---
