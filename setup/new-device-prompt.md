@@ -2,45 +2,51 @@
 
 You are bootstrapping a new device for the super-werewolves homelab workflow. The
 device is **assumed to have LAN access** to the homelab — either physical LAN, or
-WireGuard already up. If it doesn't, this prompt will detect that in Phase 0 and
-redirect the human to `setup/wireguard-prompt.md` first.
+WireGuard already up. If it doesn't, Phase 0 will detect that and ask the human to run
+the separate WireGuard bootstrap prompt before continuing.
 
 Work through the phases below in order. After every phase, summarise what you did and
 confirm the human is ready before moving on.
 
 Homelab facts (current as of this prompt's last edit — verify before asserting):
 
-- Gitea web: `http://git.home.superwerewolves.ninja` (LAN-only DNS via Pi-hole at `10.7.42.21`).
-- Gitea SSH: `ssh://gitea@git.home.superwerewolves.ninja:2222`.
+- Gitea web UI: `http://git.home.superwerewolves.ninja` (LAN-only DNS via Pi-hole at
+  `10.7.42.21`). Use this for browser links.
+- Gitea SSH endpoint: `gitea.int.superwerewolves.ninja:2222`. Use this for clone URLs,
+  SSH config, and `ssh -T` tests. (The `*.int` host targets the Gitea LXC's IP
+  directly; the `*.home` host targets the web UI through NPM. Different paths — don't
+  cross them.)
 - Org: `super-werewolves` (most repos) and `selina` (a couple of personal repos).
 - Default repo location: `~/gitea-repos/<repo>`.
 
 ## Phase 0 — Confirm LAN access
 
-Before doing anything else, confirm this device can reach the homelab.
+Before doing anything else, confirm this device can reach the homelab. Use whatever
+tools are appropriate for this platform — don't assume a specific shell.
 
-1. **Test LAN reachability.** Try DNS resolution and HTTP in one shot:
+1. **Test LAN reachability.** Two checks:
 
-   ```
-   getent hosts git.home.superwerewolves.ninja || nslookup git.home.superwerewolves.ninja
-   curl -sS --connect-timeout 3 --max-time 5 -o /dev/null -w "%{http_code}\n" http://git.home.superwerewolves.ninja
-   ```
+   - Resolve `git.home.superwerewolves.ninja` via the platform's DNS-lookup tool
+     (whichever is available: `getent`, `nslookup`, `dig`, `Resolve-DnsName`, etc.).
+     Expected result: a `10.7.42.x` address.
+   - Make an HTTP GET to `http://git.home.superwerewolves.ninja/` (use whatever HTTP
+     client is available: `curl`, `wget`, `Invoke-WebRequest`, etc.). Expected status:
+     `200` or `302`.
 
-   `getent` / `nslookup` should resolve to a `10.7.42.x` address, and `curl` should
-   return `200` or `302`. If both pass → continue to Phase 1.
+   If both pass → continue to Phase 1.
 
-2. **If unreachable**, check for an existing-but-down WireGuard tunnel before sending
-   the human to the WG prompt:
-
-   - Linux/WSL: `command -v wg && sudo wg show 2>/dev/null` and `ip link show wg0 2>/dev/null`
-   - macOS / Windows / Android: ask the human to check the WireGuard app's status panel.
+2. **If unreachable**, check whether WireGuard is configured but the tunnel is down
+   before falling back to the WG bootstrap prompt. The exact check depends on the
+   platform — Linux/WSL has a `wg0` interface and the `wg` CLI; macOS / Windows /
+   Android use the WireGuard GUI app and the human needs to look at it. Ask the human
+   if you can't determine WG status programmatically.
 
 3. **Branch on the result:**
 
    | State | Action |
    |-------|--------|
-   | WG installed, tunnel down | Use AskUserQuestion: "WireGuard is installed but the tunnel is down. Bring it up?" → options: "Yes — `sudo wg-quick up wg0`", "I'll bring it up via the GUI app", "No — exit". After "yes", bring it up and re-run the Phase 0 reachability check. |
-   | WG not installed | Tell the human: "This device has no LAN access and no WireGuard configured. Paste `setup/wireguard-prompt.md` to set that up first, then come back and re-paste this prompt." Stop. |
+   | WG installed, tunnel down | Use AskUserQuestion: "WireGuard is configured but the tunnel is down. Bring it up?" → options: "Yes — bring it up now", "I'll bring it up via the GUI app", "No — exit". After "yes", use the platform's command to start the tunnel (e.g. `wg-quick up wg0` on Linux/WSL), then re-run the Phase 0 reachability check. |
+   | WG not installed | Tell the human: "This device has no LAN access and no WireGuard configured. Run the WireGuard bootstrap prompt (`wireguard-prompt.md` in this same `setup/` directory) first to get on the VPN, then come back and re-paste this prompt." Stop. |
    | LAN reachable after retry | Continue to Phase 1. |
    | Still unreachable after WG up | Stop and help the human diagnose — don't push forward into a flow that will fail. |
 
@@ -73,8 +79,8 @@ The device can now reach Gitea. Set up SSH-based auth and clone `development-ski
 3. **Configure `~/.ssh/config`** — append a stanza if not already present:
 
    ```
-   Host git.home.superwerewolves.ninja
-       HostName git.home.superwerewolves.ninja
+   Host gitea.int.superwerewolves.ninja
+       HostName gitea.int.superwerewolves.ninja
        Port 2222
        User gitea
        IdentityFile ~/.ssh/id_ed25519_gitea
@@ -82,7 +88,7 @@ The device can now reach Gitea. Set up SSH-based auth and clone `development-ski
        StrictHostKeyChecking accept-new
    ```
 
-   Then `chmod 600 ~/.ssh/config`. Idempotent — if a `Host git.home.superwerewolves.ninja`
+   Then `chmod 600 ~/.ssh/config`. Idempotent — if a `Host gitea.int.superwerewolves.ninja`
    block already exists, leave it alone.
 
 4. **Stop and ask the human to add the SSH public key to Gitea:**
@@ -102,7 +108,7 @@ The device can now reach Gitea. Set up SSH-based auth and clone `development-ski
 5. **Test SSH auth:**
 
    ```
-   ssh -T -o ConnectTimeout=5 git@git.home.superwerewolves.ninja
+   ssh -T -o ConnectTimeout=5 gitea@gitea.int.superwerewolves.ninja
    ```
 
    A successful auth returns a Gitea greeting on stderr ("Hi <user>! You've successfully
@@ -113,7 +119,7 @@ The device can now reach Gitea. Set up SSH-based auth and clone `development-ski
 
    ```
    mkdir -p ~/gitea-repos
-   git clone ssh://gitea@git.home.superwerewolves.ninja:2222/super-werewolves/development-skills.git ~/gitea-repos/development-skills
+   git clone ssh://gitea@gitea.int.superwerewolves.ninja:2222/super-werewolves/development-skills.git ~/gitea-repos/development-skills
    ```
 
 ## Phase 2 — Platform setup

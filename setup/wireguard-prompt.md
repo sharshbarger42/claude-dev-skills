@@ -198,19 +198,15 @@ back.
 
 ## Step 9 — Verify
 
-```
-sudo wg show wg0          # CLI only — GUI users check the app's status panel
-ping -c 3 10.7.42.21
-getent hosts git.home.superwerewolves.ninja || nslookup git.home.superwerewolves.ninja
-curl -sS --max-time 5 -o /dev/null -w "%{http_code}\n" http://git.home.superwerewolves.ninja
-```
+Run four checks. Use the right tool for the platform detected in Step 1 — don't assume
+the commands below run as-is on every shell.
 
-Expected:
-
-- `wg show` shows a recent handshake and non-zero rx/tx.
-- Ping succeeds.
-- DNS resolves (Pi-hole is reachable).
-- HTTP returns `200` or `302`.
+| Check | What to verify | Linux / WSL / Termux | macOS | Windows-native |
+|-------|----------------|----------------------|-------|----------------|
+| Tunnel handshake | Recent handshake, non-zero rx/tx | `sudo wg show wg0` | `sudo wg show wg0` | WireGuard GUI status panel |
+| LAN ping | Reachable | `ping -c 3 10.7.42.21` | `ping -c 3 10.7.42.21` | `Test-Connection 10.7.42.21` |
+| DNS resolution | `git.home.superwerewolves.ninja` resolves to a `10.7.42.x` address | `getent hosts ...` or `nslookup ...` | `dscacheutil -q host -a name ...` or `dig ...` | `Resolve-DnsName ...` |
+| HTTP reachability | Status `200` or `302` | `curl -sS -o /dev/null -w "%{http_code}\n" http://git.home.superwerewolves.ninja` | same | `Invoke-WebRequest -Uri ... -UseBasicParsing` |
 
 If any fail, common causes — work through them in order:
 
@@ -236,7 +232,8 @@ WireGuard tunnel: up
 LAN reachable: yes (verified ping + DNS + HTTP).
 
 Next step for the human:
-  Paste setup/new-device-prompt.md to continue with Gitea SSH + /setup-env.
+  Paste the new-device bootstrap prompt (the `new-device-prompt.md` file alongside this
+  one in development-skills/setup/) to continue with Gitea SSH + /setup-env.
 ```
 
 ## Rules
