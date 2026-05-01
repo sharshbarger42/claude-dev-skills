@@ -12,7 +12,7 @@ git:
 # Gitea configuration
 gitea:
   url: "https://git.home.superwerewolves.ninja"
-  ssh: "ssh://gitea@git.home.superwerewolves.ninja:2222"
+  ssh: "ssh://gitea@gitea.int.superwerewolves.ninja:2222"
   org: "super-werewolves"
 
 # Development types — uncomment what applies

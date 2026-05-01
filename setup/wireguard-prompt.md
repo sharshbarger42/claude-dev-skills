@@ -47,9 +47,9 @@ Branch on the result:
 Use the platform's package manager. Each platform should end up with `wg`, `wg-quick`,
 and a working `resolvconf` (or equivalent).
 
-| Platform | Command |
-|----------|---------|
-| Debian / Ubuntu / WSL2 | `sudo apt-get update && sudo apt-get install -y wireguard wireguard-tools resolvconf qrencode` |
+| Platform | Commands |
+|----------|----------|
+| Debian / Ubuntu / WSL2 | First `sudo apt-get update`, then in a separate `Bash` call: `sudo apt-get install -y wireguard wireguard-tools resolvconf qrencode`. The "one sudo per Bash call" rule (line 244) applies here — never chain with `&&`. |
 | Termux (rooted) | `pkg install wireguard-tools` (root required for `wg-quick up`) |
 
 For WSL2, also confirm the kernel has WireGuard support: `modinfo wireguard` should
@@ -58,18 +58,28 @@ succeed. Recent WSL2 kernels (5.10+) ship it built-in; older ones need
 
 ## Step 3 — Generate a client keypair
 
-Use restrictive perms. Never echo, copy, or transmit the private key.
+Use restrictive perms. The keypair lives entirely inside root's process — `umask 077`
+must be set inside the same `sudo` invocation that creates the file, otherwise root's
+umask (often `0022`) wins and the private key ends up `0644`.
 
 ```
 sudo install -d -m 700 /etc/wireguard
-( umask 077 && wg genkey | sudo tee /etc/wireguard/client_private.key | wg pubkey | sudo tee /etc/wireguard/client_public.key > /dev/null )
+sudo bash -c 'umask 077 && cd /etc/wireguard && wg genkey | tee client_private.key | wg pubkey > client_public.key'
+sudo chmod 600 /etc/wireguard/client_private.key
+sudo chmod 644 /etc/wireguard/client_public.key
 ```
 
-Show the human only the public key:
+Show the human only the **public** key:
 
 ```
 sudo cat /etc/wireguard/client_public.key
 ```
+
+**Critical rule: only ever read from `*_public.key`.** Never `cat`, `echo`, `$(...)`,
+or otherwise pipe `client_private.key` through the calling shell. When the private key
+needs to land in a file, do the read-and-merge inside a single `sudo bash -c '...'` so
+the value never crosses into the parent shell's process memory or argv (where `set -x`,
+shell history, or harness command-echo could log it).
 
 ## Step 4 — Collect peer values (default-then-confirm)
 
@@ -93,28 +103,27 @@ Defaults to compute / hardcode:
 | MTU | `1420` | Standard for WireGuard over typical residential WAN. |
 | DNS | `10.7.42.21` | Pi-hole. |
 
-Present the defaults using AskUserQuestion:
-
-```
-AskUserQuestion:
-  question: "Defaults — peer name <hostname>, endpoint vpn.superwerewolves.ninja:51820, AllowedIPs split-tunnel (10.7.42.0/24, 10.7.99.0/24), DNS 10.7.42.21, MTU 1420. Override anything?"
-  options:
-    - "Use defaults (still need tunnel IP + server pubkey from OPNsense)"
-    - "Override one or more defaults"
-```
+Use AskUserQuestion with the question "Defaults — peer name `<hostname>`, endpoint
+`vpn.superwerewolves.ninja:51820`, AllowedIPs split-tunnel (`10.7.42.0/24, 10.7.99.0/24`),
+DNS `10.7.42.21`, MTU `1420`. Override anything?" and options "Use defaults (still need
+tunnel IP + server pubkey from OPNsense)" and "Override one or more defaults".
 
 Then ask for the unavoidable inputs (tunnel IP, server pubkey) and any overrides. Show
 the final values back to the human and ask them to confirm before writing the config.
 
 ## Step 5 — Write the config
 
-Read the private key from `/etc/wireguard/client_private.key` and inline it via heredoc.
-**Do not echo the private key to the terminal.**
+Construct the config inside a single `sudo bash -c '...'` so the private key is read
+and substituted entirely within root's shell. The outer single-quotes prevent the
+parent shell from expanding `$(cat ...)` — the substitution happens in the inner
+shell, not the calling one. **Do not** fall back to `sudo tee <<EOF` with `$(sudo cat
+client_private.key)` in the heredoc body — that routes the key through the parent
+shell where `set -x`, history, or harness command-echo can log it.
 
 ```
-sudo tee /etc/wireguard/wg0.conf > /dev/null <<EOF
+sudo bash -c 'cat > /etc/wireguard/wg0.conf << CONFEOF
 [Interface]
-PrivateKey = $(sudo cat /etc/wireguard/client_private.key)
+PrivateKey = $(cat /etc/wireguard/client_private.key)
 Address = <peer_tunnel_ip>/32
 MTU = <mtu>
 DNS = <dns>
@@ -124,11 +133,13 @@ PublicKey = <server_pubkey>
 AllowedIPs = <allowed_ips>
 Endpoint = <endpoint>
 PersistentKeepalive = 25
-EOF
-sudo chmod 600 /etc/wireguard/wg0.conf
+CONFEOF
+chmod 600 /etc/wireguard/wg0.conf'
 ```
 
 After writing, **do not `cat /etc/wireguard/wg0.conf`** — it contains the private key.
+Safe diagnostics that don't expose the key: `sudo wg show wg0`, `ip addr show wg0`,
+and (to inspect non-secret fields) `sudo grep -v '^PrivateKey' /etc/wireguard/wg0.conf`.
 
 ## Step 6 — GUI fallback (macOS / Windows / unrooted Android)
 
@@ -181,11 +192,16 @@ handshake will fail and waste diagnostic time.
 
 ## Step 8 — Bring the tunnel up
 
-CLI platforms:
+CLI platforms — bring the tunnel up first, then enable the unit only if systemd is
+actually running (older WSL distros and Termux don't have systemd, and `systemctl
+enable` will fail noisily on those):
 
 ```
 sudo wg-quick up wg0
-sudo systemctl enable wg-quick@wg0    # Linux/WSL only — Termux uses a different mechanism
+```
+
+```
+[ -d /run/systemd/system ] && sudo systemctl enable wg-quick@wg0 || echo "systemd not running — bring up the tunnel manually after reboot, or enable systemd in /etc/wsl.conf and reboot the distro."
 ```
 
 WSL caveats: if `wg-quick up` fails with a `resolvconf` error, install `openresolv`
@@ -205,8 +221,8 @@ the commands below run as-is on every shell.
 |-------|----------------|----------------------|-------|----------------|
 | Tunnel handshake | Recent handshake, non-zero rx/tx | `sudo wg show wg0` | `sudo wg show wg0` | WireGuard GUI status panel |
 | LAN ping | Reachable | `ping -c 3 10.7.42.21` | `ping -c 3 10.7.42.21` | `Test-Connection 10.7.42.21` |
-| DNS resolution | `git.home.superwerewolves.ninja` resolves to a `10.7.42.x` address | `getent hosts ...` or `nslookup ...` | `dscacheutil -q host -a name ...` or `dig ...` | `Resolve-DnsName ...` |
-| HTTP reachability | Status `200` or `302` | `curl -sS -o /dev/null -w "%{http_code}\n" http://git.home.superwerewolves.ninja` | same | `Invoke-WebRequest -Uri ... -UseBasicParsing` |
+| DNS resolution | Resolves to a `10.7.42.x` address | `getent hosts git.home.superwerewolves.ninja` (or `nslookup git.home.superwerewolves.ninja`) | `dscacheutil -q host -a name git.home.superwerewolves.ninja` (or `dig git.home.superwerewolves.ninja`) | `Resolve-DnsName git.home.superwerewolves.ninja` |
+| HTTP reachability | Status `200` or `302` | `curl -sS -o /dev/null -w "%{http_code}\n" http://git.home.superwerewolves.ninja` | `curl -sS -o /dev/null -w "%{http_code}\n" http://git.home.superwerewolves.ninja` | `Invoke-WebRequest -Uri http://git.home.superwerewolves.ninja -UseBasicParsing \| Select-Object -ExpandProperty StatusCode` |
 
 If any fail, common causes — work through them in order:
 

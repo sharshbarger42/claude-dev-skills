@@ -45,7 +45,7 @@ tools are appropriate for this platform — don't assume a specific shell.
 
    | State | Action |
    |-------|--------|
-   | WG installed, tunnel down | Use AskUserQuestion: "WireGuard is configured but the tunnel is down. Bring it up?" → options: "Yes — bring it up now", "I'll bring it up via the GUI app", "No — exit". After "yes", use the platform's command to start the tunnel (e.g. `wg-quick up wg0` on Linux/WSL), then re-run the Phase 0 reachability check. |
+   | WG installed, tunnel down | **First confirm `wg0` is actually the homelab tunnel** — the user might have a separate WG to a work VPN on the same interface. Check the configured peer endpoint matches `vpn.superwerewolves.ninja` (try `sudo wg show wg0 endpoints`, or `grep -E '^Endpoint' /etc/wireguard/wg0.conf` if config is readable). If it's a different VPN, stop and tell the human — don't bring up an unrelated tunnel and loop. If it's the right tunnel, use AskUserQuestion: "WireGuard is configured but the tunnel is down. Bring it up?" → options: "Yes — bring it up now", "I'll bring it up via the GUI app", "No — exit". After "yes", use the platform's command to start the tunnel (e.g. `wg-quick up wg0` on Linux/WSL), then re-run the Phase 0 reachability check. |
    | WG not installed | Tell the human: "This device has no LAN access and no WireGuard configured. Run the WireGuard bootstrap prompt (`wireguard-prompt.md` in this same `setup/` directory) first to get on the VPN, then come back and re-paste this prompt." Stop. |
    | LAN reachable after retry | Continue to Phase 1. |
    | Still unreachable after WG up | Stop and help the human diagnose — don't push forward into a flow that will fail. |
@@ -70,10 +70,17 @@ The device can now reach Gitea. Set up SSH-based auth and clone `development-ski
    git config --global push.autoSetupRemote true
    ```
 
-2. **Generate a Gitea-specific SSH key** if one doesn't already exist:
+2. **Ensure `~/.ssh` exists with the right perms, then generate a Gitea-specific SSH
+   key** if one doesn't already exist. Also reconstruct the public key from the private
+   if the `.pub` file is missing (e.g. accidentally deleted on a previous run):
 
    ```
-   test -f ~/.ssh/id_ed25519_gitea || ssh-keygen -t ed25519 -C "<email>" -f ~/.ssh/id_ed25519_gitea -N ""
+   install -d -m 700 ~/.ssh
+   [ -f ~/.ssh/id_ed25519_gitea ] || ssh-keygen -t ed25519 -C "<email>" -f ~/.ssh/id_ed25519_gitea -N ""
+   ```
+
+   ```
+   if [ -f ~/.ssh/id_ed25519_gitea ] && [ ! -f ~/.ssh/id_ed25519_gitea.pub ]; then ssh-keygen -y -f ~/.ssh/id_ed25519_gitea > ~/.ssh/id_ed25519_gitea.pub && chmod 644 ~/.ssh/id_ed25519_gitea.pub; fi
    ```
 
 3. **Configure `~/.ssh/config`** — append a stanza if not already present:
@@ -89,7 +96,16 @@ The device can now reach Gitea. Set up SSH-based auth and clone `development-ski
    ```
 
    Then `chmod 600 ~/.ssh/config`. Idempotent — if a `Host gitea.int.superwerewolves.ninja`
-   block already exists, leave it alone.
+   block already exists, **read it and verify the `Port` line is `2222`**. If the existing
+   block has a different port, stop and ask the human how to reconcile (the `ssh -T` test
+   in step 5 will silently fall back to port 22 otherwise).
+
+   `StrictHostKeyChecking accept-new` silently TOFUs the Gitea host key on first connect.
+   The threat model on a homelab LAN is weak (an attacker on the LAN already has bigger
+   reach), but for a paranoid run the human can verify by fetching the offered key
+   (`ssh-keyscan -p 2222 -t ed25519 gitea.int.superwerewolves.ninja | ssh-keygen -lf -`)
+   and comparing the fingerprint to `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`
+   from the Gitea host.
 
 4. **Stop and ask the human to add the SSH public key to Gitea:**
 
@@ -105,15 +121,18 @@ The device can now reach Gitea. Set up SSH-based auth and clone `development-ski
    Reply "added" when done.
    ```
 
-5. **Test SSH auth:**
+5. **Test SSH auth.** Pass `-p 2222` explicitly (don't rely on the SSH config block from
+   step 3 to supply the port — if a stale stanza exists, ssh silently falls back to 22).
+   Bump the timeout to 10s and retry once on failure, since Gitea sometimes has a brief
+   cache delay right after a key is added in the web UI:
 
    ```
-   ssh -T -o ConnectTimeout=5 gitea@gitea.int.superwerewolves.ninja
+   ssh -T -p 2222 -o ConnectTimeout=10 -o NumberOfPasswordPrompts=0 gitea@gitea.int.superwerewolves.ninja || ( sleep 3 && ssh -T -p 2222 -o ConnectTimeout=10 -o NumberOfPasswordPrompts=0 gitea@gitea.int.superwerewolves.ninja )
    ```
 
    A successful auth returns a Gitea greeting on stderr ("Hi <user>! You've successfully
-   authenticated...") with exit code 1 — that's expected. If auth fails, help the human
-   verify the key was saved in Gitea, then retry.
+   authenticated...") with exit code 1 — that's expected. If both attempts fail, help
+   the human verify the key was saved in Gitea, then retry.
 
 6. **Clone `development-skills`:**
 
@@ -148,25 +167,7 @@ Now that the repo is cloned, figure out what installer/helper this device needs.
    | State | Action |
    |-------|--------|
    | Helper exists for this platform | Use AskUserQuestion: "Run `<script path>` to install platform basics? It installs core packages, Node, Claude CLI, etc." → "Yes, run it now", "Show me what it does first", "Skip — already set up". |
-   | No helper for this platform | Use AskUserQuestion: "No setup script exists for <platform>. Options:" → "Author one in setup/platform-helpers/setup-<platform>.<ext> and run it", "Author one but I'll review before running", "Skip — I'll handle platform basics manually". |
-
-4. **If authoring a new helper script**, write it under
-   `~/gitea-repos/development-skills/setup/platform-helpers/setup-<platform>.<ext>` on
-   a worktree branch:
-
-   ```
-   git -C ~/gitea-repos/development-skills fetch origin
-   git -C ~/gitea-repos/development-skills worktree add -b setup/<platform>-helper ~/gitea-repos/development-skills/.claude-worktrees/<platform>-helper origin/main
-   ```
-
-   The helper should mirror `setup/wsl-sandbox/setup-linux.sh` in shape — install the
-   platform's package manager equivalents of: `git`, `node` (via nvm or platform native),
-   `@anthropic-ai/claude-code` (npm global), `zsh`, `stow`, `qrencode`, `wireguard-tools`.
-   It should **not** duplicate `/setup-env`'s job — defer Gitea MCP / Discord /
-   productivity-docs / plugins to that skill.
-
-   After authoring, commit on the worktree branch and tell the human to push + open a
-   PR. Then run the script.
+   | No helper for this platform | Tell the human: "No setup script exists for `<platform>`. Authoring helper scripts for new platforms is tracked in `super-werewolves/development-skills#158` and belongs in a normal `/do-issue` loop, not in this bootstrap. For now, install the equivalents of `setup/wsl-sandbox/setup-linux.sh`'s outputs manually using the platform's package manager: `git`, Node.js (via the platform's preferred path), the Claude CLI (`npm install -g @anthropic-ai/claude-code`), `zsh`, `stow`, `qrencode`. Then continue to Phase 3." Stop offering to author the script here — it's out of scope. |
 
 ## Phase 3 — Hand off to /setup-env
 
@@ -174,11 +175,21 @@ The remaining configuration (Gitea MCP token, Discord webhook, productivity docs
 plugins, dev-type tools) is handled interactively by the `/setup-env` skill, which has
 its own AskUserQuestion flow and shouldn't be driven from inside this prompt.
 
-1. **Register the plugin marketplace:**
+1. **Register the plugin marketplace, then verify it took:**
 
    ```
    claude plugin marketplace add ~/gitea-repos/development-skills
    ```
+
+   ```
+   claude plugin marketplace list
+   ```
+
+   The output should include an entry for the local `development-skills` checkout. If
+   it doesn't, stop — there's likely a manifest issue at
+   `~/gitea-repos/development-skills/.claude-plugin/marketplace.json`. Don't tell the
+   human to re-launch into `/setup-env` until the marketplace registration is
+   confirmed, or `/setup-env` will fail when it tries to install plugins.
 
 2. **Tell the human to exit this Claude session and run:**
 

@@ -8,7 +8,7 @@ super-werewolves homelab.
 | Path | Purpose |
 |------|---------|
 | `new-device-prompt.md` | Copy-paste prompt for `claude` on a fresh device that already has LAN access. Sets up Gitea SSH, clones `development-skills`, hands off to `/setup-env`. |
-| `wireguard-prompt.md` | Copy-paste prompt for `claude` on a fresh device that does **not** have LAN access. Walks the human through WireGuard client setup against OPNsense, then exits — they re-run `new-device-prompt.md` afterwards. |
+| `wireguard-prompt.md` | Copy-paste prompt for `claude` on a fresh device that does **not** have LAN access. Walks the human through WireGuard client setup against OPNsense, then exits — they re-paste `new-device-prompt.md` afterwards. |
 | `wsl-sandbox/setup-linux.sh` | Per-OS one-shot installer for the WSL Ubuntu-Claude sandbox. Installs core packages, Node, Claude CLI, Oh My Zsh, dotfiles. Defers all dev-skills config to `/setup-env`. |
 | `wsl-sandbox/setup-windows.ps1` | Provisioning side of the WSL sandbox — runs from PowerShell on the Windows host. |
 | `wsl-sandbox/teardown-windows.ps1` | Removes the WSL sandbox + cleanup. |
